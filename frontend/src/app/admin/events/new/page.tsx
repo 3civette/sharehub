@@ -1,0 +1,228 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import EventForm from '@/components/admin/EventForm';
+import TokenDisplay from '@/components/events/TokenDisplay';
+import AdminHeader from '@/components/admin/AdminHeader';
+
+interface TokensResponse {
+  admin_token: string;
+  organizer_token: string;
+  participant_token: string;
+}
+
+export default function NewEventPage() {
+  const router = useRouter();
+  const supabase = createClientComponentClient();
+
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [tokens, setTokens] = useState<TokensResponse | null>(null);
+  const [createdEventName, setCreatedEventName] = useState<string>('');
+
+  const handleSubmit = async (data: any) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Get current user for auth
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        router.push('/login');
+        return;
+      }
+
+      // Get session token
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
+      if (!token) {
+        throw new Error('No authentication token available');
+      }
+
+      // Create event via API
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+      const response = await fetch(`${API_URL}/events`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to create event');
+      }
+
+      const result = await response.json();
+
+      // If event is private, show tokens
+      if (data.visibility === 'private' && result.tokens) {
+        setTokens(result.tokens);
+        setCreatedEventName(data.event_name);
+      } else {
+        // Redirect immediately for public events
+        router.push('/admin/events');
+      }
+    } catch (err: any) {
+      console.error('Error creating event:', err);
+      setError(err.message || 'Failed to create event');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleContinue = () => {
+    router.push('/admin/events');
+  };
+
+  // Show tokens screen after creating private event
+  if (tokens) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+        <header className="bg-white shadow-sm">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <h1 className="text-2xl font-bold text-gray-900">Evento Creato con Successo!</h1>
+          </div>
+        </header>
+
+        <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="bg-white rounded-lg shadow-md p-6 space-y-6">
+            <div className="flex items-center gap-3 pb-4 border-b border-gray-200">
+              <div className="flex-shrink-0">
+                <svg
+                  className="w-12 h-12 text-green-500"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+              </div>
+              <div>
+                <h2 className="text-xl font-semibold text-gray-900">{createdEventName}</h2>
+                <p className="text-sm text-gray-600">Evento privato creato con successo</p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex gap-3">
+                  <svg
+                    className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                  <div>
+                    <h3 className="text-sm font-medium text-blue-900 mb-1">
+                      Salva questi token
+                    </h3>
+                    <p className="text-sm text-blue-800">
+                      Questi token sono necessari per accedere all'evento privato.
+                      Conservali in un luogo sicuro - non potranno essere recuperati successivamente.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <TokenDisplay
+                label="Admin Token"
+                token={tokens.admin_token}
+                description="Accesso completo per amministratori"
+              />
+
+              <TokenDisplay
+                label="Organizer Token"
+                token={tokens.organizer_token}
+                description="Accesso per organizzatori (upload e gestione slide)"
+              />
+
+              <TokenDisplay
+                label="Participant Token"
+                token={tokens.participant_token}
+                description="Accesso per partecipanti (solo download)"
+              />
+            </div>
+
+            <div className="pt-4 border-t border-gray-200">
+              <button
+                onClick={handleContinue}
+                className="w-full bg-blue-600 text-white px-6 py-3 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium transition-colors"
+              >
+                Continua alla Lista Eventi
+              </button>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  // Show event form
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+      <AdminHeader
+        title="Crea Nuovo Evento"
+        subtitle="Compila i dettagli per creare un nuovo evento"
+        actions={
+          <button
+            onClick={() => router.push('/admin/events')}
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            Annulla
+          </button>
+        }
+      />
+
+      <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="bg-white rounded-lg shadow-md p-6">
+          {error && (
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md">
+              <div className="flex gap-3">
+                <svg
+                  className="w-5 h-5 text-red-600 flex-shrink-0"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+                <div>
+                  <h3 className="text-sm font-medium text-red-900">Errore</h3>
+                  <p className="text-sm text-red-800 mt-1">{error}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <EventForm
+            mode="create"
+            onSubmit={handleSubmit}
+          />
+        </div>
+      </main>
+    </div>
+  );
+}

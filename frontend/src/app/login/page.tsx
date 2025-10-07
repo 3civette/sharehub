@@ -7,7 +7,7 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirect = searchParams.get('redirect') || '/admin/branding';
+  const redirect = searchParams.get('redirect') || '/admin/dashboard';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -44,7 +44,7 @@ export default function LoginPage() {
       <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-8">
         <div className="text-center mb-8">
           <h2 className="text-3xl font-bold text-gray-900">ShareHub Admin</h2>
-          <p className="mt-2 text-sm text-gray-600">Sign in to access the admin panel</p>
+          <p className="mt-2 text-sm text-gray-600">Accedi per gestire il pannello amministrativo</p>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-6">
@@ -56,7 +56,7 @@ export default function LoginPage() {
 
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-              Email address
+              Indirizzo email
             </label>
             <input
               id="email"
@@ -65,7 +65,7 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-              placeholder="admin@example.com"
+              placeholder="admin@esempio.it"
             />
           </div>
 
@@ -89,7 +89,7 @@ export default function LoginPage() {
             disabled={loading}
             className="w-full py-3 bg-primary text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? 'Signing in...' : 'Sign in'}
+            {loading ? 'Accesso in corso...' : 'Accedi'}
           </button>
         </form>
       </div>

@@ -3,6 +3,16 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { api } from '@/lib/api';
 
+interface Branding {
+  id: string;
+  tenant_id: string;
+  primary_color: string;
+  secondary_color: string;
+  logo_url?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 interface Tenant {
   id: string;
   subdomain: string;
@@ -14,24 +24,48 @@ interface Tenant {
 
 interface TenantContextType {
   tenant: Tenant | null;
+  branding: Branding | null;
   loading: boolean;
   error: string | null;
   refetchTenant: () => Promise<void>;
+  updateBranding: (branding: Branding) => void;
 }
 
 const TenantContext = createContext<TenantContextType>({
   tenant: null,
+  branding: null,
   loading: true,
   error: null,
   refetchTenant: async () => {},
+  updateBranding: () => {},
 });
 
 export const useTenant = () => useContext(TenantContext);
+export const useTenantBranding = () => {
+  const { branding, updateBranding } = useContext(TenantContext);
+  return { branding, updateBranding };
+};
 
 export function TenantProvider({ children }: { children: ReactNode }) {
   const [tenant, setTenant] = useState<Tenant | null>(null);
+  const [branding, setBranding] = useState<Branding | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const applyBrandingToDOM = (brandingData: Branding) => {
+    const root = document.documentElement;
+    if (brandingData.primary_color) {
+      root.style.setProperty('--color-primary', brandingData.primary_color);
+    }
+    if (brandingData.secondary_color) {
+      root.style.setProperty('--color-secondary', brandingData.secondary_color);
+    }
+  };
+
+  const updateBranding = (newBranding: Branding) => {
+    setBranding(newBranding);
+    applyBrandingToDOM(newBranding);
+  };
 
   const fetchTenant = async () => {
     try {
@@ -50,17 +84,18 @@ export function TenantProvider({ children }: { children: ReactNode }) {
 
       setTenant(tenantData as Tenant);
 
-      if (tenantData.branding) {
-        const root = document.documentElement;
-        if (tenantData.branding.primary_color) {
-          root.style.setProperty('--color-primary', tenantData.branding.primary_color);
+      // Fetch branding separately
+      try {
+        const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+        const brandingResponse = await fetch(`${API_URL}/branding/${tenantData.id}`);
+        if (brandingResponse.ok) {
+          const brandingData = await brandingResponse.json();
+          setBranding(brandingData);
+          applyBrandingToDOM(brandingData);
         }
-        if (tenantData.branding.secondary_color) {
-          root.style.setProperty('--color-secondary', tenantData.branding.secondary_color);
-        }
-        if (tenantData.branding.font_family) {
-          root.style.setProperty('--font-family', tenantData.branding.font_family);
-        }
+      } catch (brandingErr) {
+        console.error('Failed to fetch branding:', brandingErr);
+        // Continue without branding if it fails
       }
     } catch (err: any) {
       console.error('Failed to fetch tenant:', err);
@@ -75,7 +110,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <TenantContext.Provider value={{ tenant, loading, error, refetchTenant: fetchTenant }}>
+    <TenantContext.Provider value={{ tenant, branding, loading, error, refetchTenant: fetchTenant, updateBranding }}>
       {children}
     </TenantContext.Provider>
   );

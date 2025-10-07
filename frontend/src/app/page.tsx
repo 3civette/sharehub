@@ -1,12 +1,46 @@
 'use client';
 
 import { useTenant } from '@/contexts/TenantContext';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import Link from 'next/link';
 
 export default function HomePage() {
   const { tenant, loading } = useTenant();
+  const router = useRouter();
+  const supabase = createClientComponentClient();
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [checkingAuth, setCheckingAuth] = useState(true);
 
-  if (loading) {
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        setIsAuthenticated(!!session);
+        setUserEmail(session?.user?.email || null);
+      } catch (error) {
+        console.error('Error checking auth:', error);
+        setIsAuthenticated(false);
+        setUserEmail(null);
+      } finally {
+        setCheckingAuth(false);
+      }
+    };
+
+    checkAuth();
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsAuthenticated(!!session);
+      setUserEmail(session?.user?.email || null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, [supabase]);
+
+  if (loading || checkingAuth) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
@@ -25,12 +59,19 @@ export default function HomePage() {
             )}
             <h1 className="text-2xl font-bold text-gray-900">{tenant?.hotel_name || 'ShareHub'}</h1>
           </div>
-          <Link
-            href="/admin/branding"
-            className="text-sm text-gray-600 hover:text-primary transition-colors"
-          >
-            Admin Panel
-          </Link>
+          <div className="flex items-center gap-4">
+            {isAuthenticated && userEmail && (
+              <span className="text-sm text-gray-600">
+                Loggato come: <span className="font-semibold text-gray-900">{userEmail}</span>
+              </span>
+            )}
+            <Link
+              href="/admin/branding"
+              className="text-sm text-gray-600 hover:text-primary transition-colors"
+            >
+              Pannello Admin
+            </Link>
+          </div>
         </div>
       </header>
 
@@ -38,25 +79,39 @@ export default function HomePage() {
       <section className="py-20 px-4">
         <div className="max-w-4xl mx-auto text-center">
           <h2 className="text-5xl font-bold text-gray-900 mb-6">
-            Welcome to {tenant?.hotel_name || 'ShareHub'}
+            Benvenuto in {tenant?.hotel_name || 'ShareHub'}
           </h2>
           <p className="text-xl text-gray-600 mb-12">
-            Access event presentations, download slides, and stay connected with our latest content.
+            Accedi alle presentazioni degli eventi, scarica le slide e rimani aggiornato sui nostri contenuti.
           </p>
 
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link
-              href="/events/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
-              className="px-8 py-3 bg-primary text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors"
-            >
-              View Sample Event
-            </Link>
-            <Link
-              href="/admin/events"
-              className="px-8 py-3 bg-white text-primary border-2 border-primary rounded-lg font-semibold hover:bg-blue-50 transition-colors"
-            >
-              Manage Events
-            </Link>
+          <div className="flex justify-center gap-4">
+            {isAuthenticated ? (
+              <>
+                <Link
+                  href="/admin/dashboard"
+                  className="px-8 py-4 bg-primary text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors shadow-lg hover:shadow-xl"
+                >
+                  Vai alla Dashboard
+                </Link>
+                <button
+                  onClick={async () => {
+                    await supabase.auth.signOut();
+                    router.refresh();
+                  }}
+                  className="px-8 py-4 bg-white text-gray-700 border-2 border-gray-300 rounded-lg font-semibold hover:bg-gray-50 transition-colors shadow-lg hover:shadow-xl"
+                >
+                  Esci
+                </button>
+              </>
+            ) : (
+              <Link
+                href="/login?redirect=/admin/dashboard"
+                className="px-8 py-4 bg-primary text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors shadow-lg hover:shadow-xl"
+              >
+                Accedi alla Dashboard
+              </Link>
+            )}
           </div>
         </div>
       </section>
@@ -65,23 +120,23 @@ export default function HomePage() {
       <section className="py-16 px-4 bg-white">
         <div className="max-w-6xl mx-auto">
           <h3 className="text-3xl font-bold text-center text-gray-900 mb-12">
-            Platform Features
+            Funzionalità della Piattaforma
           </h3>
           <div className="grid md:grid-cols-3 gap-8">
             <FeatureCard
               icon="📅"
-              title="Event Management"
-              description="Create and manage public or private events with custom access controls."
+              title="Gestione Eventi"
+              description="Crea e gestisci eventi pubblici o privati con controlli di accesso personalizzati."
             />
             <FeatureCard
               icon="📊"
-              title="Slide Sharing"
-              description="Upload, organize, and share presentation slides with attendees."
+              title="Condivisione Slide"
+              description="Carica, organizza e condividi slide di presentazioni con i partecipanti."
             />
             <FeatureCard
               icon="🎨"
-              title="Custom Branding"
-              description="Customize colors, logos, and fonts to match your brand identity."
+              title="Branding Personalizzato"
+              description="Personalizza colori, loghi e caratteri per riflettere l'identità del tuo brand."
             />
           </div>
         </div>
@@ -91,7 +146,7 @@ export default function HomePage() {
       <footer className="bg-gray-900 text-white py-8 px-4">
         <div className="max-w-6xl mx-auto text-center">
           <p className="text-gray-400">
-            © 2025 {tenant?.hotel_name || 'ShareHub'}. All rights reserved.
+            © 2025 {tenant?.hotel_name || 'ShareHub'}. Tutti i diritti riservati.
           </p>
         </div>
       </footer>

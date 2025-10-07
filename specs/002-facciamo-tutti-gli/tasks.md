@@ -295,7 +295,7 @@ app.use('/settings', settingsRouter);
 
 ### Frontend Components
 
-#### T021 [P]: Create ColorPicker.tsx component
+#### [X] T021 [P]: Create ColorPicker.tsx component
 **File**: `frontend/src/components/admin/ColorPicker.tsx`
 **Description**: Create color picker component using react-colorful (research.md decision 1):
 - Props: `value: string` (hex), `onChange: (color: string) => void`, `label: string`
@@ -307,7 +307,7 @@ app.use('/settings', settingsRouter);
 
 ---
 
-#### T022 [P]: Create LogoUpload.tsx with client validation
+#### [X] T022 [P]: Create LogoUpload.tsx with client validation
 **File**: `frontend/src/components/admin/LogoUpload.tsx`
 **Description**: Create logo upload component with client-side validation (research.md decision 2):
 - Props: `currentLogo?: string`, `onUpload: (file: File) => void`, `onRemove: () => void`
@@ -321,7 +321,7 @@ app.use('/settings', settingsRouter);
 
 ---
 
-#### T023 [P]: Create BrandingPreview.tsx live preview
+#### [X] T023 [P]: Create BrandingPreview.tsx live preview
 **File**: `frontend/src/components/admin/BrandingPreview.tsx`
 **Description**: Create live preview component for branding changes (research.md decision 3):
 - Props: `primaryColor: string`, `secondaryColor: string`, `logoUrl?: string`
@@ -335,7 +335,7 @@ app.use('/settings', settingsRouter);
 
 ---
 
-#### T024 [P]: Create EventForm.tsx shared create/edit form
+#### [X] T024 [P]: Create EventForm.tsx shared create/edit form
 **File**: `frontend/src/components/admin/EventForm.tsx`
 **Description**: Create shared form component for create and edit event:
 - Props: `initialData?: Event`, `onSubmit: (data: EventCreateInput | EventUpdateInput) => void`, `mode: 'create' | 'edit'`, `isReadOnly?: boolean`
@@ -348,7 +348,7 @@ app.use('/settings', settingsRouter);
 
 ---
 
-#### T025 [P]: Create EventList.tsx with sort/filter UI
+#### [X] T025 [P]: Create EventList.tsx with sort/filter UI
 **File**: `frontend/src/components/admin/EventList.tsx`
 **Description**: Create event list component with sort and filter controls (research.md decision 5):
 - Props: `events: Event[]`, `onEventClick: (id: string) => void`
@@ -363,7 +363,7 @@ app.use('/settings', settingsRouter);
 
 ---
 
-#### T026 [P]: Create SettingsForm.tsx
+#### [X] T026 [P]: Create SettingsForm.tsx
 **File**: `frontend/src/components/admin/SettingsForm.tsx`
 **Description**: Create settings form component:
 - Props: `initialData: TenantSettings`, `onSubmit: (data: TenantSettingsUpdateInput) => void`
@@ -375,7 +375,7 @@ app.use('/settings', settingsRouter);
 
 ---
 
-#### T027 [P]: Extend AdminNav.tsx with new routes
+#### [X] T027 [P]: Extend AdminNav.tsx with new routes
 **File**: `frontend/src/components/layout/AdminNav.tsx` (extend existing)
 **Description**: Add navigation links for new admin screens:
 - Link to `/admin/events` (Events List)
@@ -389,7 +389,7 @@ app.use('/settings', settingsRouter);
 
 ### Frontend Pages
 
-#### T028: Create /admin/events/new/page.tsx (create event screen)
+#### [X] T028: Create /admin/events/new/page.tsx (create event screen)
 **File**: `frontend/src/app/admin/events/new/page.tsx`
 **Description**: Create event creation page:
 - Fetch tenant ID from auth context
@@ -403,7 +403,7 @@ app.use('/settings', settingsRouter);
 
 ---
 
-#### T029: Create /admin/events/[id]/edit/page.tsx (edit event screen)
+#### [X] T029: Create /admin/events/[id]/edit/page.tsx (edit event screen)
 **File**: `frontend/src/app/admin/events/[id]/edit/page.tsx`
 **Description**: Create event edit page:
 - Fetch event by ID from `/events/:id` API
@@ -418,7 +418,7 @@ app.use('/settings', settingsRouter);
 
 ---
 
-#### T030: Update /admin/events/page.tsx (event list with sort/filter)
+#### [X] T030: Update /admin/events/page.tsx (event list with sort/filter)
 **File**: `frontend/src/app/admin/events/page.tsx` (extend or create)
 **Description**: Create/update event list page:
 - Parse URL search params for sort and filter (useSearchParams)
@@ -431,7 +431,7 @@ app.use('/settings', settingsRouter);
 
 ---
 
-#### T031: Create /admin/branding/page.tsx (branding customization)
+#### [X] T031: Create /admin/branding/page.tsx (branding customization)
 **File**: `frontend/src/app/admin/branding/page.tsx`
 **Description**: Create branding customization page:
 - Fetch tenant branding from `/branding/:tenantId` API
@@ -451,7 +451,7 @@ app.use('/settings', settingsRouter);
 
 ---
 
-#### T032: Create /admin/settings/page.tsx (settings screen)
+#### [X] T032: Create /admin/settings/page.tsx (settings screen)
 **File**: `frontend/src/app/admin/settings/page.tsx`
 **Description**: Create settings page:
 - Fetch settings from `/settings/:tenantId` API
@@ -465,7 +465,7 @@ app.use('/settings', settingsRouter);
 
 ---
 
-#### T033: Extend TenantContext.tsx with branding state
+#### [X] T033: Extend TenantContext.tsx with branding state
 **File**: `frontend/src/contexts/TenantContext.tsx` (extend existing)
 **Description**: Extend tenant context to include branding:
 - Add `branding: Branding` to context state
@@ -486,7 +486,7 @@ app.use('/settings', settingsRouter);
 
 ## Phase 3.4: Integration Tests (After Implementation)
 
-### T034 [P]: Integration test - Create Event Flow (Scenario 1)
+### [X] T034 [P]: Integration test - Create Event Flow (Scenario 1)
 **File**: `backend/tests/integration/create-event-flow.test.ts`
 **Description**: Implement integration test per quickstart.md Scenario 1:
 - Login as admin → save token
@@ -498,7 +498,7 @@ app.use('/settings', settingsRouter);
 
 ---
 
-### T035 [P]: Integration test - Edit Event Flow (Scenario 2)
+### [X] T035 [P]: Integration test - Edit Event Flow (Scenario 2)
 **File**: `backend/tests/integration/edit-event-flow.test.ts`
 **Description**: Implement integration test per quickstart.md Scenario 2:
 - Create future event
@@ -509,7 +509,7 @@ app.use('/settings', settingsRouter);
 
 ---
 
-### T036 [P]: Integration test - Branding Flow (Scenario 3)
+### [X] T036 [P]: Integration test - Branding Flow (Scenario 3)
 **File**: `backend/tests/integration/branding-flow.test.ts`
 **Description**: Implement integration test per quickstart.md Scenario 3:
 - Get current branding → verify defaults
@@ -521,7 +521,7 @@ app.use('/settings', settingsRouter);
 
 ---
 
-### T037 [P]: Integration test - Event List Flow (Scenario 4)
+### [X] T037 [P]: Integration test - Event List Flow (Scenario 4)
 **File**: `backend/tests/integration/event-list-flow.test.ts`
 **Description**: Implement integration test per quickstart.md Scenario 4:
 - Create 3 future events with different dates
@@ -535,7 +535,7 @@ app.use('/settings', settingsRouter);
 
 ---
 
-### T038 [P]: Integration test - Settings Flow (Scenario 5)
+### [X] T038 [P]: Integration test - Settings Flow (Scenario 5)
 **File**: `backend/tests/integration/settings-flow.test.ts`
 **Description**: Implement integration test per quickstart.md Scenario 5:
 - Get settings → verify current values + billing_info present
@@ -550,7 +550,7 @@ app.use('/settings', settingsRouter);
 
 ## Phase 3.5: Polish
 
-### T039: Performance validation (<1s page load, <2s list render)
+### [X] T039: Performance validation (<1s page load, <2s list render)
 **File**: N/A (manual testing + performance metrics)
 **Description**: Validate performance targets per plan.md:
 - Page load time: < 1s (measure Time to First Contentful Paint for /admin/dashboard)
@@ -563,7 +563,7 @@ app.use('/settings', settingsRouter);
 
 ---
 
-### T040: Run manual testing checklist from quickstart.md
+### [X] T040: Run manual testing checklist from quickstart.md
 **File**: N/A (manual testing)
 **Description**: Execute all manual tests from quickstart.md manual testing checklist (lines 229-254):
 - Create public/private events → verify tokens
@@ -578,7 +578,7 @@ app.use('/settings', settingsRouter);
 
 ---
 
-### T041: Update CLAUDE.md with feature notes
+### [X] T041: Update CLAUDE.md with feature notes
 **File**: `CLAUDE.md` (extend existing)
 **Description**: Document feature-specific patterns for future development:
 - Branding: CSS custom properties pattern for dynamic theming
