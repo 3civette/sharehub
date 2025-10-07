@@ -3,12 +3,18 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { Branding, BrandingUpdateInput, DEFAULT_BRANDING } from '../models/admin';
-import { isValidHexColor } from './branding';
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
+
+/**
+ * Validate hex color format
+ */
+function isValidHexColor(color: string): boolean {
+  return /^#[0-9A-Fa-f]{6}$/.test(color);
+}
 
 /**
  * Get tenant branding configuration

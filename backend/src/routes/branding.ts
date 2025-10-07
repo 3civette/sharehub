@@ -1,6 +1,5 @@
 import express from 'express';
 import { createClient } from '@supabase/supabase-js';
-import { validateBrandingConfig, validateBrandingOverrides } from '../services/branding';
 import { logActivity } from '../services/activityLogger';
 
 const router = express.Router();
@@ -40,12 +39,6 @@ router.put('/tenants/:tenantId/branding', async (req, res) => {
     const { tenantId } = req.params;
     const { branding_config } = req.body;
 
-    // Validate branding config
-    const validationError = validateBrandingConfig(branding_config);
-    if (validationError) {
-      return res.status(400).json({ error: validationError });
-    }
-
     const { error } = await supabase
       .from('tenants')
       .update({ branding_config })
@@ -78,12 +71,6 @@ router.put('/events/:eventId/branding', async (req, res) => {
   try {
     const { eventId } = req.params;
     const { branding_overrides } = req.body;
-
-    // Validate branding overrides
-    const validationError = validateBrandingOverrides(branding_overrides);
-    if (validationError) {
-      return res.status(400).json({ error: validationError });
-    }
 
     // Get event details for logging
     const { data: event } = await supabase
