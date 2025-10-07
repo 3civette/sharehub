@@ -1,11 +1,14 @@
+import dotenv from 'dotenv';
+import path from 'path';
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
+
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import tenantsRouter from './routes/tenants';
 import eventsRouter from './routes/events';
 import slidesRouter from './routes/slides';
-
-dotenv.config();
+import dashboardRouter from './routes/dashboard';
+import brandingRouter from './routes/branding';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -18,6 +21,8 @@ app.use(express.json());
 app.use('/tenants', tenantsRouter);
 app.use('/events', eventsRouter);
 app.use('/slides', slidesRouter);
+app.use('/dashboard', dashboardRouter);
+app.use('/', brandingRouter);
 
 // Health check
 app.get('/health', (req, res) => {
