@@ -1,0 +1,399 @@
+openapi: 3.0.3
+info:
+  title: ShareHub Dashboard API
+  description: API contracts for hotel admin dashboard feature
+  version: 1.0.0
+servers:
+  - url: http://localhost:3001/api
+    description: Local development server
+
+components:
+  schemas:
+    DashboardMetrics:
+      type: object
+      required:
+        - active_events_count
+        - last_activity_at
+      properties:
+        active_events_count:
+          type: integer
+          minimum: 0
+          example: 5
+        last_activity_at:
+          type: string
+          format: date-time
+          nullable: true
+          example: "2025-10-06T14:30:00Z"
+
+    Activity:
+      type: object
+      required:
+        - id
+        - tenant_id
+        - actor_type
+        - action_type
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenant_id:
+          type: string
+          format: uuid
+        event_id:
+          type: string
+          format: uuid
+          nullable: true
+        actor_type:
+          type: string
+          enum: [admin, organizer, participant, system]
+        action_type:
+          type: string
+          example: "event_created"
+        metadata:
+          type: object
+          additionalProperties: true
+        created_at:
+          type: string
+          format: date-time
+        event_title:
+          type: string
+          nullable: true
+
+    EventTokens:
+      type: object
+      required:
+        - organizer_token
+        - participant_token
+      properties:
+        organizer_token:
+          type: string
+          example: "V1StGXR8_Z5jdHi6B-myT"
+        participant_token:
+          type: string
+          example: "A2BcDeFgHiJkLmNoPqRsT"
+
+    BrandingConfig:
+      type: object
+      required:
+        - colors
+      properties:
+        colors:
+          type: object
+          required:
+            - primary
+            - secondary
+          properties:
+            primary:
+              type: string
+              pattern: '^#[0-9A-F]{6}$'
+              example: "#3B82F6"
+            secondary:
+              type: string
+              pattern: '^#[0-9A-F]{6}$'
+              example: "#10B981"
+        logo_url:
+          type: string
+          format: uri
+          nullable: true
+        advertisements:
+          type: array
+          items:
+            $ref: '#/components/schemas/Advertisement'
+
+    Advertisement:
+      type: object
+      required:
+        - id
+        - image_url
+        - position
+      properties:
+        id:
+          type: string
+        image_url:
+          type: string
+          format: uri
+        link_url:
+          type: string
+          format: uri
+          nullable: true
+        position:
+          type: string
+          enum: [header, sidebar, footer]
+
+    BrandingOverrides:
+      type: object
+      properties:
+        colors:
+          type: object
+          required:
+            - customizable
+          properties:
+            value:
+              type: object
+              nullable: true
+              properties:
+                primary:
+                  type: string
+                secondary:
+                  type: string
+            customizable:
+              type: boolean
+        logo_url:
+          type: object
+          required:
+            - customizable
+          properties:
+            value:
+              type: string
+              nullable: true
+            customizable:
+              type: boolean
+        advertisements:
+          type: object
+          required:
+            - customizable
+          properties:
+            value:
+              type: array
+              nullable: true
+              items:
+                $ref: '#/components/schemas/Advertisement'
+            customizable:
+              type: boolean
+
+    Error:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+
+paths:
+  /dashboard/metrics/{tenantId}:
+    get:
+      summary: Get dashboard metrics for a tenant
+      operationId: getDashboardMetrics
+      tags:
+        - Dashboard
+      parameters:
+        - name: tenantId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Dashboard metrics retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardMetrics'
+        '404':
+          description: Tenant not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /dashboard/activity/{tenantId}:
+    get:
+      summary: Get recent activity for a tenant
+      operationId: getDashboardActivity
+      tags:
+        - Dashboard
+      parameters:
+        - name: tenantId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 20
+            default: 5
+      responses:
+        '200':
+          description: Activity log retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - activities
+                properties:
+                  activities:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Activity'
+        '404':
+          description: Tenant not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /events/{eventId}/tokens:
+    get:
+      summary: Get tokens for an event
+      operationId: getEventTokens
+      tags:
+        - Events
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Event tokens retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventTokens'
+        '404':
+          description: Event not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /tenants/{tenantId}/branding:
+    get:
+      summary: Get branding configuration for a tenant
+      operationId: getTenantBranding
+      tags:
+        - Branding
+      parameters:
+        - name: tenantId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Branding configuration retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - branding_config
+                properties:
+                  branding_config:
+                    $ref: '#/components/schemas/BrandingConfig'
+        '404':
+          description: Tenant not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    put:
+      summary: Update branding configuration for a tenant
+      operationId: updateTenantBranding
+      tags:
+        - Branding
+      parameters:
+        - name: tenantId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - branding_config
+              properties:
+                branding_config:
+                  $ref: '#/components/schemas/BrandingConfig'
+      responses:
+        '200':
+          description: Branding updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+        '400':
+          description: Invalid branding configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Tenant not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /events/{eventId}/branding:
+    put:
+      summary: Update branding overrides for an event
+      operationId: updateEventBranding
+      tags:
+        - Branding
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - branding_overrides
+              properties:
+                branding_overrides:
+                  $ref: '#/components/schemas/BrandingOverrides'
+      responses:
+        '200':
+          description: Event branding updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+        '400':
+          description: Invalid branding overrides
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Event not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'

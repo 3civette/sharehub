@@ -1,0 +1,31 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git stash:*)",
+      "Bash(git commit:*)",
+      "Bash(node:*)",
+      "Bash(cat $APPDATA/Claude/claude_desktop_config.json)",
+      "Bash(curl -X POST http://localhost:3001/tenants/by-subdomain/test-hotel)",
+      "Bash(curl http://localhost:3001/tenants/by-subdomain/test-hotel)",
+      "Bash(curl -X GET \"https://agmkgrpxgpzqscbkizdl.supabase.co/rest/v1/admins?select=tenant_id&id=eq.621f3aa6-d32b-4496-9c92-acc53c3827c0\" )",
+      "Bash(curl http://localhost:3001/dashboard/metrics/523c2648-f980-4c9e-8e53-93d812cfa79f)",
+      "Bash(curl:*)",
+      "Bash(git add:*)",
+      "Bash(powershell:*)",
+      "Read(//c/Users/KreshOS/Documents/00-Progetti/shareHub/specs/002-facciamo-tutti-gli/**)",
+      "Bash(npm install:*)",
+      "Bash(git log:*)",
+      "Bash(findstr:*)",
+      "Bash(git reset:*)",
+      "Bash(git checkout:*)",
+      "Bash(git merge:*)",
+      "Bash(git branch:*)",
+      "Bash(npm start)",
+      "Bash(npm run dev:*)",
+      "Bash(npm run build:*)",
+      "Bash(netstat:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

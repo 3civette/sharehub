@@ -22,6 +22,10 @@ router.get('/:id/download', async (req, res) => {
       .from('slides')
       .createSignedUrl(slide.storage_path, 3600);
 
+    if (!signedUrl) {
+      return res.status(500).json({ error: 'Failed to generate signed URL' });
+    }
+
     res.json({ download_url: signedUrl.signedUrl, expires_at: new Date(Date.now() + 3600000).toISOString() });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
