@@ -9,6 +9,11 @@ import eventsRouter from './routes/events';
 import slidesRouter from './routes/slides';
 import dashboardRouter from './routes/dashboard';
 import brandingRouter from './routes/branding';
+// Admin panel routes (Feature 002)
+import adminBrandingRouter from './routes/admin-branding';
+import adminSettingsRouter from './routes/admin-settings';
+import adminEventsRouter from './routes/admin-events';
+import { adminAuth, verifyTenantAccess } from './middleware/adminAuth';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -23,6 +28,11 @@ app.use('/events', eventsRouter);
 app.use('/slides', slidesRouter);
 app.use('/dashboard', dashboardRouter);
 app.use('/', brandingRouter);
+
+// Admin panel routes (Feature 002 - with auth middleware)
+app.use('/branding', adminAuth, verifyTenantAccess, adminBrandingRouter);
+app.use('/settings', adminAuth, verifyTenantAccess, adminSettingsRouter);
+app.use('/admin/events', adminAuth, adminEventsRouter);
 
 // Health check
 app.get('/health', (req, res) => {

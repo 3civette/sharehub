@@ -1,0 +1,240 @@
+openapi: 3.0.0
+info:
+  title: ShareHub Events API
+  version: 1.0.0
+  description: Event management endpoints for admin panel
+
+paths:
+  /events:
+    post:
+      summary: Create new event
+      operationId: createEvent
+      tags: [Events]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventCreateInput'
+      responses:
+        '201':
+          description: Event created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Event'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden (not an admin)
+
+    get:
+      summary: List events with sorting and filtering
+      operationId: listEvents
+      tags: [Events]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [date-asc, date-desc, created-desc]
+            default: date-asc
+          description: Sort order
+        - name: filter
+          in: query
+          schema:
+            type: string
+            enum: [all, active, past]
+            default: all
+          description: Filter by status
+      responses:
+        '200':
+          description: List of events
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  events:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Event'
+                  total:
+                    type: integer
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden (not an admin)
+
+  /events/{id}:
+    put:
+      summary: Update event (future events only)
+      operationId: updateEvent
+      tags: [Events]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventUpdateInput'
+      responses:
+        '200':
+          description: Event updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Event'
+        '400':
+          description: Validation error or past event
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden (not owner or not admin)
+        '404':
+          description: Event not found
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Event:
+      type: object
+      required:
+        - id
+        - tenant_id
+        - event_name
+        - event_date
+        - visibility
+        - status
+        - created_by
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenant_id:
+          type: string
+          format: uuid
+        event_name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        event_date:
+          type: string
+          format: date
+        description:
+          type: string
+          maxLength: 2000
+          nullable: true
+        visibility:
+          type: string
+          enum: [public, private]
+        status:
+          type: string
+          enum: [active, past]
+          description: Computed from event_date
+        created_by:
+          type: string
+          format: uuid
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        branding_overrides:
+          type: object
+          nullable: true
+          properties:
+            primary_color:
+              type: string
+              pattern: '^#[0-9A-Fa-f]{6}$'
+            secondary_color:
+              type: string
+              pattern: '^#[0-9A-Fa-f]{6}$'
+            logo_url:
+              type: string
+
+    EventCreateInput:
+      type: object
+      required:
+        - event_name
+        - event_date
+        - visibility
+      properties:
+        event_name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        event_date:
+          type: string
+          format: date
+          description: Must be >= today
+        description:
+          type: string
+          maxLength: 2000
+        visibility:
+          type: string
+          enum: [public, private]
+
+    EventUpdateInput:
+      type: object
+      properties:
+        event_name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        event_date:
+          type: string
+          format: date
+          description: Must be >= today
+        description:
+          type: string
+          maxLength: 2000
+        visibility:
+          type: string
+          enum: [public, private]
+
+    Error:
+      type: object
+      required:
+        - message
+      properties:
+        message:
+          type: string
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+              message:
+                type: string

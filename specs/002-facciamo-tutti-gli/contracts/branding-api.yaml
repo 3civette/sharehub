@@ -1,0 +1,233 @@
+openapi: 3.0.0
+info:
+  title: ShareHub Branding API
+  version: 1.0.0
+  description: Tenant branding management endpoints
+
+paths:
+  /branding/{tenantId}:
+    get:
+      summary: Get tenant branding configuration
+      operationId: getBranding
+      tags: [Branding]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tenantId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Tenant branding configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Branding'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden (not tenant admin)
+        '404':
+          description: Tenant not found
+
+    put:
+      summary: Update tenant branding (colors only)
+      operationId: updateBranding
+      tags: [Branding]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tenantId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BrandingUpdateInput'
+      responses:
+        '200':
+          description: Branding updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Branding'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden (not tenant admin)
+        '404':
+          description: Tenant not found
+
+  /branding/{tenantId}/logo:
+    post:
+      summary: Upload tenant logo
+      operationId: uploadLogo
+      tags: [Branding]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tenantId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - logo
+              properties:
+                logo:
+                  type: string
+                  format: binary
+                  description: Logo file (PNG, JPG, or SVG, max 2MB)
+      responses:
+        '200':
+          description: Logo uploaded successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  logo_url:
+                    type: string
+                    description: Public URL of uploaded logo
+        '400':
+          description: Validation error (file size, type, etc.)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden (not tenant admin)
+
+    delete:
+      summary: Remove tenant logo
+      operationId: deleteLogo
+      tags: [Branding]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tenantId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Logo removed successfully
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden (not tenant admin)
+        '404':
+          description: Tenant or logo not found
+
+  /branding/{tenantId}/reset:
+    post:
+      summary: Reset branding to default values
+      operationId: resetBranding
+      tags: [Branding]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tenantId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Branding reset to defaults
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Branding'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden (not tenant admin)
+        '404':
+          description: Tenant not found
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Branding:
+      type: object
+      required:
+        - primary_color
+        - secondary_color
+        - logo_url
+      properties:
+        primary_color:
+          type: string
+          pattern: '^#[0-9A-Fa-f]{6}$'
+          example: '#3B82F6'
+          description: Primary color (hex format)
+        secondary_color:
+          type: string
+          pattern: '^#[0-9A-Fa-f]{6}$'
+          example: '#10B981'
+          description: Secondary color (hex format)
+        logo_url:
+          type: string
+          nullable: true
+          example: 'https://supabase.co/storage/v1/object/public/logos/tenant-123/logo.png'
+          description: Public URL of logo or null
+
+    BrandingUpdateInput:
+      type: object
+      properties:
+        primary_color:
+          type: string
+          pattern: '^#[0-9A-Fa-f]{6}$'
+          example: '#3B82F6'
+        secondary_color:
+          type: string
+          pattern: '^#[0-9A-Fa-f]{6}$'
+          example: '#10B981'
+
+    Error:
+      type: object
+      required:
+        - message
+      properties:
+        message:
+          type: string
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+              message:
+                type: string
