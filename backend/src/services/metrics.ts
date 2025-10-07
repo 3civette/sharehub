@@ -14,12 +14,12 @@ export interface DashboardMetrics {
 }
 
 export async function getDashboardMetrics(tenantId: string): Promise<DashboardMetrics> {
-  // Get active events count (events in the future or today)
+  // Get active events count (upcoming events)
   const { count: activeEventsCount, error: eventsError } = await supabase
     .from('events')
     .select('*', { count: 'exact', head: true })
     .eq('tenant_id', tenantId)
-    .gte('event_date', new Date().toISOString().split('T')[0]); // Events today or in the future
+    .eq('status', 'upcoming'); // Use status field from Feature 003
 
   if (eventsError) {
     console.error('Error fetching active events:', eventsError);
@@ -29,9 +29,9 @@ export async function getDashboardMetrics(tenantId: string): Promise<DashboardMe
   // Get last activity timestamp
   const { data: lastActivity, error: activityError } = await supabase
     .from('activity_logs')
-    .select('created_at')
+    .select('timestamp')
     .eq('tenant_id', tenantId)
-    .order('created_at', { ascending: false })
+    .order('timestamp', { ascending: false })
     .limit(1)
     .single();
 
@@ -42,6 +42,6 @@ export async function getDashboardMetrics(tenantId: string): Promise<DashboardMe
 
   return {
     active_events_count: activeEventsCount || 0,
-    last_activity_at: lastActivity?.created_at || null
+    last_activity_at: lastActivity?.timestamp || null
   };
 }

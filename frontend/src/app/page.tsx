@@ -92,7 +92,7 @@ export default function HomePage() {
                   href="/admin/dashboard"
                   className="px-8 py-4 bg-primary text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors shadow-lg hover:shadow-xl"
                 >
-                  Vai alla Dashboard
+                  Dashboard
                 </Link>
                 <button
                   onClick={async () => {
@@ -109,7 +109,7 @@ export default function HomePage() {
                 href="/login?redirect=/admin/dashboard"
                 className="px-8 py-4 bg-primary text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors shadow-lg hover:shadow-xl"
               >
-                Accedi alla Dashboard
+                Accedi
               </Link>
             )}
           </div>

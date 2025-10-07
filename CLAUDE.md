@@ -6,6 +6,8 @@ Auto-generated from all feature plans. Last updated: 2025-10-06
 - TypeScript 5.3+ (Node.js 20 LTS for backend, React 18 for frontend) + Next.js 14 (frontend), Express.js (backend API), Supabase (database + auth), Tailwind CSS (styling) (001-voglio-creare-l)
 - TypeScript 5.3+ (Node.js 20 LTS backend, React 18 frontend) (002-facciamo-tutti-gli)
 - Supabase PostgreSQL with RLS policies, Supabase Storage for logo files (002-facciamo-tutti-gli)
+- TypeScript 5.3+ (Node.js 20 LTS backend, React 18 frontend) + Express.js (backend), Next.js 14 App Router (frontend), Supabase (database + auth + storage), Tailwind CSS (styling) (003-ora-facciamo-il)
+- Supabase PostgreSQL with RLS policies, Supabase Storage for slide files (003-ora-facciamo-il)
 
 ## Project Structure
 ```
@@ -21,6 +23,7 @@ npm test; npm run lint
 TypeScript 5.3+ (Node.js 20 LTS for backend, React 18 for frontend): Follow standard conventions
 
 ## Recent Changes
+- 003-ora-facciamo-il: Added TypeScript 5.3+ (Node.js 20 LTS backend, React 18 frontend) + Express.js (backend), Next.js 14 App Router (frontend), Supabase (database + auth + storage), Tailwind CSS (styling)
 - 002-facciamo-tutti-gli: Added TypeScript 5.3+ (Node.js 20 LTS backend, React 18 frontend)
 - 001-voglio-creare-l: Added TypeScript 5.3+ (Node.js 20 LTS for backend, React 18 for frontend) + Next.js 14 (frontend), Express.js (backend API), Supabase (database + auth), Tailwind CSS (styling)
 

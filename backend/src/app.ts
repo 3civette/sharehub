@@ -15,6 +15,14 @@ import adminSettingsRouter from './routes/admin-settings';
 import adminEventsRouter from './routes/admin-events';
 import { adminAuth, verifyTenantAccess } from './middleware/adminAuth';
 
+// Event Flow routes (Feature 003)
+import eventFlowRoutes from './routes/eventFlowRoutes';
+import sessionRoutes from './routes/sessionRoutes';
+import speechRoutes from './routes/speechRoutes';
+import slideRoutes from './routes/slideRoutes';
+import dashboardFlowRoutes from './routes/dashboardRoutes';
+import publicRoutes from './routes/publicRoutes';
+
 const app = express();
 const PORT = process.env.PORT || 3001;
 
@@ -33,6 +41,14 @@ app.use('/', brandingRouter);
 app.use('/branding', adminAuth, verifyTenantAccess, adminBrandingRouter);
 app.use('/settings', adminAuth, verifyTenantAccess, adminSettingsRouter);
 app.use('/admin/events', adminAuth, adminEventsRouter);
+
+// Event Flow routes (Feature 003 - with token-based auth in routes)
+app.use('/api/events', eventFlowRoutes);
+app.use('/api', sessionRoutes);
+app.use('/api', speechRoutes);
+app.use('/api', slideRoutes);
+app.use('/api', dashboardFlowRoutes);
+app.use('/api', publicRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

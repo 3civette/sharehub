@@ -10,11 +10,12 @@ import { useRouter, useSearchParams } from 'next/navigation';
 interface Event {
   id: string;
   tenant_id: string;
-  event_name: string;
-  event_date: string; // ISO date
+  slug: string;
+  name: string;
+  date: string; // ISO date
   description: string | null;
   visibility: 'public' | 'private';
-  status: 'active' | 'past';
+  status: 'upcoming' | 'past' | 'archived';
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -26,7 +27,7 @@ interface EventListProps {
 }
 
 type SortOption = 'date-asc' | 'date-desc' | 'created-desc';
-type FilterOption = 'all' | 'active' | 'past';
+type FilterOption = 'all' | 'upcoming' | 'past' | 'archived';
 
 export default function EventList({ events, onEventClick }: EventListProps) {
   const router = useRouter();
@@ -44,7 +45,7 @@ export default function EventList({ events, onEventClick }: EventListProps) {
       setSort(sortParam);
     }
 
-    if (filterParam && ['all', 'active', 'past'].includes(filterParam)) {
+    if (filterParam && ['all', 'upcoming', 'past', 'archived'].includes(filterParam)) {
       setFilter(filterParam);
     }
   }, [searchParams]);
@@ -79,9 +80,9 @@ export default function EventList({ events, onEventClick }: EventListProps) {
   const sortedEvents = [...filteredEvents].sort((a, b) => {
     switch (sort) {
       case 'date-asc':
-        return new Date(a.event_date).getTime() - new Date(b.event_date).getTime();
+        return new Date(a.date).getTime() - new Date(b.date).getTime();
       case 'date-desc':
-        return new Date(b.event_date).getTime() - new Date(a.event_date).getTime();
+        return new Date(b.date).getTime() - new Date(a.date).getTime();
       case 'created-desc':
         return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       default:
@@ -136,8 +137,9 @@ export default function EventList({ events, onEventClick }: EventListProps) {
               className="px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
             >
               <option value="all">All Events</option>
-              <option value="active">Active</option>
+              <option value="upcoming">Upcoming</option>
               <option value="past">Past</option>
+              <option value="archived">Archived</option>
             </select>
           </div>
         </div>
@@ -200,7 +202,7 @@ export default function EventList({ events, onEventClick }: EventListProps) {
                   {/* Event Name */}
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm font-medium text-gray-900">
-                      {event.event_name}
+                      {event.name}
                     </div>
                     {event.description && (
                       <div className="text-xs text-gray-500 truncate max-w-xs">
@@ -211,7 +213,7 @@ export default function EventList({ events, onEventClick }: EventListProps) {
 
                   {/* Date */}
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                    {formatDate(event.event_date)}
+                    {formatDate(event.date)}
                   </td>
 
                   {/* Visibility */}
@@ -249,9 +251,11 @@ export default function EventList({ events, onEventClick }: EventListProps) {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span
                       className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        event.status === 'active'
+                        event.status === 'upcoming'
                           ? 'bg-blue-100 text-blue-800'
-                          : 'bg-gray-100 text-gray-800'
+                          : event.status === 'past'
+                          ? 'bg-gray-100 text-gray-800'
+                          : 'bg-yellow-100 text-yellow-800'
                       }`}
                     >
                       {event.status}
@@ -260,12 +264,26 @@ export default function EventList({ events, onEventClick }: EventListProps) {
 
                   {/* Actions */}
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <button
-                      onClick={() => onEventClick(event.id)}
-                      className="text-blue-600 hover:text-blue-900 transition-colors"
-                    >
-                      {isPastEvent(event) ? 'View' : 'Edit'}
-                    </button>
+                    <div className="flex items-center justify-end gap-3">
+                      <a
+                        href={`/events/${event.slug}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-green-600 hover:text-green-900 transition-colors flex items-center gap-1"
+                        title="Apri pagina pubblica"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                        Pubblica
+                      </a>
+                      <button
+                        onClick={() => onEventClick(event.id)}
+                        className="text-blue-600 hover:text-blue-900 transition-colors"
+                      >
+                        {isPastEvent(event) ? 'View' : 'Edit'}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

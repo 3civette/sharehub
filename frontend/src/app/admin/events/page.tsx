@@ -9,11 +9,12 @@ import AdminHeader from '@/components/admin/AdminHeader';
 interface Event {
   id: string;
   tenant_id: string;
-  event_name: string;
-  event_date: string;
+  slug: string;
+  name: string;
+  date: string;
   description: string | null;
   visibility: 'public' | 'private';
-  status: 'active' | 'past';
+  status: 'upcoming' | 'past' | 'archived';
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -44,34 +45,49 @@ export default function AdminEventsPage() {
         return;
       }
 
-      // Get session token
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
+      // Get admin's tenant
+      const { data: adminData, error: adminError } = await supabase
+        .from('admins')
+        .select('tenant_id')
+        .eq('id', user.id)
+        .single();
 
-      if (!token) {
-        throw new Error('No authentication token available');
+      if (adminError || !adminData) {
+        throw new Error('Unable to fetch user tenant');
       }
 
       // Parse URL params
       const sort = searchParams.get('sort') || 'date-asc';
       const filter = searchParams.get('filter') || 'all';
 
-      // Fetch events from API
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-      const url = `${API_URL}/events?sort=${sort}&filter=${filter}`;
+      // Build query
+      let query = supabase
+        .from('events')
+        .select('*')
+        .eq('tenant_id', adminData.tenant_id);
 
-      const response = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch events');
+      // Apply filters
+      if (filter === 'upcoming') {
+        query = query.eq('status', 'upcoming');
+      } else if (filter === 'past') {
+        query = query.eq('status', 'past');
+      } else if (filter === 'archived') {
+        query = query.eq('status', 'archived');
       }
 
-      const data = await response.json();
-      setEvents(data.events || data || []);
+      // Apply sorting
+      const [sortField, sortOrder] = sort.split('-');
+      query = query.order(sortField === 'date' ? 'date' : 'created_at', {
+        ascending: sortOrder === 'asc'
+      });
+
+      const { data, error } = await query;
+
+      if (error) {
+        throw error;
+      }
+
+      setEvents(data || []);
     } catch (err: any) {
       console.error('Error fetching events:', err);
       setError(err.message || 'Failed to load events');

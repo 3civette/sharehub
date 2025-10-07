@@ -23,7 +23,13 @@
       "Bash(npm start)",
       "Bash(npm run dev:*)",
       "Bash(npm run build:*)",
-      "Bash(netstat:*)"
+      "Bash(netstat:*)",
+      "Read(//c/Users/KreshOS/Documents/00-Progetti/shareHub/.specify/templates/**)",
+      "Read(//c/Users/KreshOS/Documents/00-Progetti/shareHub/.specify/memory/**)",
+      "Bash(mkdir:*)",
+      "Read(//c/Users/KreshOS/Documents/00-Progetti/shareHub/specs/003-ora-facciamo-il/**)",
+      "Bash(npx tsc:*)",
+      "Bash(npm test:*)"
     ],
     "deny": [],
     "ask": []

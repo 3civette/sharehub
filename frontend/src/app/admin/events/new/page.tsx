@@ -34,40 +34,63 @@ export default function NewEventPage() {
         return;
       }
 
-      // Get session token
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
+      // Get admin's tenant
+      const { data: adminData, error: adminError } = await supabase
+        .from('admins')
+        .select('tenant_id')
+        .eq('id', user.id)
+        .single();
 
-      if (!token) {
-        throw new Error('No authentication token available');
+      if (adminError || !adminData) {
+        console.error('Admin lookup error:', adminError);
+        throw new Error(`Unable to fetch user tenant: ${adminError?.message || 'User not found in admins table'}`);
       }
 
-      // Create event via API
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-      const response = await fetch(`${API_URL}/events`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(data),
-      });
+      console.log('Admin tenant ID:', adminData.tenant_id);
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Failed to create event');
+      // Generate slug from event name
+      const slug = data.event_name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '');
+
+      // Prepare event data for Feature 003
+      const eventData = {
+        tenant_id: adminData.tenant_id,
+        slug: slug,
+        name: data.event_name,
+        date: data.event_date,
+        description: data.description || null,
+        visibility: data.visibility,
+        status: 'upcoming',
+        token_expiration_date: data.visibility === 'private' ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() : null,
+        retention_policy: 'keep_forever',
+        created_by: user.id,
+      };
+
+      console.log('Attempting to insert event:', eventData);
+
+      // Insert event directly into Supabase
+      const { data: createdEvent, error: createError } = await supabase
+        .from('events')
+        .insert(eventData)
+        .select()
+        .single();
+
+      console.log('Insert result:', { createdEvent, createError });
+
+      if (createError) {
+        console.error('Insert error details:', {
+          code: createError.code,
+          message: createError.message,
+          details: createError.details,
+          hint: createError.hint
+        });
+        throw createError;
       }
 
-      const result = await response.json();
-
-      // If event is private, show tokens
-      if (data.visibility === 'private' && result.tokens) {
-        setTokens(result.tokens);
-        setCreatedEventName(data.event_name);
-      } else {
-        // Redirect immediately for public events
-        router.push('/admin/events');
-      }
+      // For now, redirect immediately (token generation will be added later)
+      router.push('/admin/events');
     } catch (err: any) {
       console.error('Error creating event:', err);
       setError(err.message || 'Failed to create event');

@@ -23,7 +23,8 @@ export async function logActivity(activity: CreateActivityLog): Promise<string> 
       actor_type: activity.actor_type,
       action_type: activity.action_type,
       metadata: activity.metadata || {},
-      created_at: new Date().toISOString()
+      timestamp: new Date().toISOString(), // Feature 003 uses 'timestamp' not 'created_at'
+      retention_days: 90 // Default retention
     })
     .select('id')
     .single();
@@ -47,7 +48,7 @@ export async function getRecentActivities(tenantId: string, limit: number = 5) {
     .from('activity_logs')
     .select('*')
     .eq('tenant_id', tenantId)
-    .order('created_at', { ascending: false })
+    .order('timestamp', { ascending: false }) // Feature 003 uses 'timestamp' not 'created_at'
     .limit(limit);
 
   if (error) {
