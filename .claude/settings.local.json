@@ -29,7 +29,12 @@
       "Bash(mkdir:*)",
       "Read(//c/Users/KreshOS/Documents/00-Progetti/shareHub/specs/003-ora-facciamo-il/**)",
       "Bash(npx tsc:*)",
-      "Bash(npm test:*)"
+      "Bash(npm test:*)",
+      "Read(//c/Users/KreshOS/Documents/00-Progetti/shareHub/**)",
+      "Bash(npx vitest run:*)",
+      "Bash(timeout 45 npx vitest run tests/contract/publicEvents.test.ts --reporter=verbose)",
+      "Bash(dir)",
+      "Bash(taskkill:*)"
     ],
     "deny": [],
     "ask": []

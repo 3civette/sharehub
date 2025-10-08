@@ -1,0 +1,391 @@
+openapi: 3.0.3
+info:
+  title: ShareHub Public Event API
+  version: 1.0.0
+  description: Public-facing endpoints for event page (Feature 004)
+
+servers:
+  - url: http://localhost:3001/api/public
+    description: Local development
+
+paths:
+  /events/{slug}:
+    get:
+      summary: Get public event by slug
+      description: |
+        Retrieve event details including sessions, speeches, and slides.
+        Public events return immediately. Private events require valid token in session.
+      operationId: getPublicEvent
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "conferenza-2025"
+      responses:
+        '200':
+          description: Event found and accessible
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicEventResponse'
+        '403':
+          description: Private event, token required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "Access denied"
+                message: "This is a private event. Please provide a valid access token."
+        '404':
+          description: Event not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "Not found"
+                message: "Event with slug 'conferenza-2025' not found."
+
+  /events/{slug}/validate-token:
+    post:
+      summary: Validate access token for private event
+      description: |
+        Verify token format, expiration, and event association.
+        Updates last_used_at and use_count on success.
+      operationId: validateEventToken
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - token
+              properties:
+                token:
+                  type: string
+                  minLength: 21
+                  maxLength: 21
+                  example: "AbC123XyZ456PqR789Lmn"
+      responses:
+        '200':
+          description: Token valid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenValidationResponse'
+              example:
+                valid: true
+                token_type: "participant"
+                expires_at: "2025-12-31T23:59:59Z"
+        '400':
+          description: Invalid token format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "Invalid token"
+                message: "Token must be exactly 21 characters."
+        '403':
+          description: Token expired or event mismatch
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenValidationResponse'
+              example:
+                valid: false
+                token_type: null
+                expires_at: null
+                message: "Token expired or does not match this event."
+
+  /events/{slug}/metrics:
+    get:
+      summary: Get public metrics for event
+      description: |
+        Returns page_views and total_slide_downloads.
+        Premium metrics (unique_visitors, per_slide_downloads) are NOT included.
+      operationId: getPublicMetrics
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Metrics retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicMetrics'
+        '404':
+          description: Event not found
+
+  /slides/{slideId}/download:
+    get:
+      summary: Download individual slide
+      description: |
+        Returns signed URL or direct file stream.
+        Rate limited to 50 downloads per hour per IP.
+        Increments total_slide_downloads and logs to activity_logs.
+      operationId: downloadSlide
+      parameters:
+        - name: slideId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '302':
+          description: Redirect to signed URL
+          headers:
+            Location:
+              schema:
+                type: string
+                format: uri
+              description: Signed Supabase Storage URL (60s expiry)
+        '429':
+          description: Rate limit exceeded
+          headers:
+            Retry-After:
+              schema:
+                type: integer
+              description: Seconds until rate limit resets
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "Rate limit exceeded"
+                message: "Download limit reached (50/hour). Please try again in 45 minutes."
+
+  /speeches/{speechId}/download-zip:
+    get:
+      summary: Download all slides for a speech as ZIP
+      description: |
+        Generates ZIP archive containing all slides for the specified speech.
+        Rate limited to 50 downloads per hour per IP (counts as 1 download).
+        ZIP filename: "{speech-title}-slides.zip"
+      operationId: downloadSpeechZip
+      parameters:
+        - name: speechId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: ZIP archive
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+              example: 'attachment; filename="introduction-slides.zip"'
+        '404':
+          description: Speech not found or no slides available
+        '429':
+          description: Rate limit exceeded
+
+  /sessions/{sessionId}/download-zip:
+    get:
+      summary: Download all slides for a session as ZIP
+      description: |
+        Generates ZIP archive containing all slides for all speeches in the session.
+        Organized as: /speech-title/slide-filename.pdf
+        Rate limited to 50 downloads per hour per IP (counts as 1 download).
+        ZIP filename: "{session-title}-slides.zip"
+      operationId: downloadSessionZip
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: ZIP archive
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+              example: 'attachment; filename="morning-session-slides.zip"'
+        '404':
+          description: Session not found or no slides available
+        '429':
+          description: Rate limit exceeded
+
+components:
+  schemas:
+    PublicEventResponse:
+      type: object
+      required:
+        - event
+        - sessions
+        - metrics
+      properties:
+        event:
+          type: object
+          required:
+            - id
+            - slug
+            - name
+            - date
+            - status
+            - visibility
+          properties:
+            id:
+              type: string
+              format: uuid
+            slug:
+              type: string
+            name:
+              type: string
+            date:
+              type: string
+              format: date
+            description:
+              type: string
+              nullable: true
+            status:
+              type: string
+              enum: [upcoming, past, archived]
+            visibility:
+              type: string
+              enum: [public, private]
+        sessions:
+          type: array
+          items:
+            type: object
+            required:
+              - id
+              - title
+              - speeches
+            properties:
+              id:
+                type: string
+                format: uuid
+              title:
+                type: string
+              description:
+                type: string
+                nullable: true
+              scheduled_time:
+                type: string
+                format: date-time
+                nullable: true
+              speeches:
+                type: array
+                items:
+                  type: object
+                  required:
+                    - id
+                    - title
+                    - speaker_name
+                    - slides
+                  properties:
+                    id:
+                      type: string
+                      format: uuid
+                    title:
+                      type: string
+                    speaker_name:
+                      type: string
+                    duration_minutes:
+                      type: integer
+                      nullable: true
+                    description:
+                      type: string
+                      nullable: true
+                    slides:
+                      type: array
+                      items:
+                        type: object
+                        required:
+                          - id
+                          - filename
+                          - file_size
+                          - mime_type
+                          - download_url
+                        properties:
+                          id:
+                            type: string
+                            format: uuid
+                          filename:
+                            type: string
+                          file_size:
+                            type: integer
+                            description: Size in bytes
+                          mime_type:
+                            type: string
+                          download_url:
+                            type: string
+                            format: uri
+                            description: Signed URL (60s expiry)
+        metrics:
+          $ref: '#/components/schemas/PublicMetrics'
+
+    PublicMetrics:
+      type: object
+      required:
+        - page_views
+        - total_slide_downloads
+      properties:
+        page_views:
+          type: integer
+          minimum: 0
+        total_slide_downloads:
+          type: integer
+          minimum: 0
+
+    TokenValidationResponse:
+      type: object
+      required:
+        - valid
+      properties:
+        valid:
+          type: boolean
+        token_type:
+          type: string
+          enum: [participant, organizer, admin]
+          nullable: true
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+        message:
+          type: string
+          description: Error message if valid=false
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+        message:
+          type: string

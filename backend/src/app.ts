@@ -23,6 +23,9 @@ import slideRoutes from './routes/slideRoutes';
 import dashboardFlowRoutes from './routes/dashboardRoutes';
 import publicRoutes from './routes/publicRoutes';
 
+// Public Event Page routes (Feature 004)
+import publicEventRoutes from './routes/publicEventRoutes';
+
 const app = express();
 const PORT = process.env.PORT || 3001;
 
@@ -49,6 +52,9 @@ app.use('/api', speechRoutes);
 app.use('/api', slideRoutes);
 app.use('/api', dashboardFlowRoutes);
 app.use('/api', publicRoutes);
+
+// Public Event Page routes (Feature 004 - no auth required)
+app.use('/api/public', publicEventRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

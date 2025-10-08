@@ -8,6 +8,7 @@ Auto-generated from all feature plans. Last updated: 2025-10-06
 - Supabase PostgreSQL with RLS policies, Supabase Storage for logo files (002-facciamo-tutti-gli)
 - TypeScript 5.3+ (Node.js 20 LTS backend, React 18 frontend) + Express.js (backend), Next.js 14 App Router (frontend), Supabase (database + auth + storage), Tailwind CSS (styling) (003-ora-facciamo-il)
 - Supabase PostgreSQL with RLS policies, Supabase Storage for slide files (003-ora-facciamo-il)
+- TypeScript 5.3+ (Node.js 20 LTS backend, React 18 frontend) + Express.js (backend API), Next.js 14 App Router (frontend), Supabase (database + auth + storage), Tailwind CSS (styling), archiver (ZIP generation) (004-facciamo-la-pagina)
 
 ## Project Structure
 ```
@@ -23,9 +24,9 @@ npm test; npm run lint
 TypeScript 5.3+ (Node.js 20 LTS for backend, React 18 for frontend): Follow standard conventions
 
 ## Recent Changes
+- 004-facciamo-la-pagina: Added TypeScript 5.3+ (Node.js 20 LTS backend, React 18 frontend) + Express.js (backend API), Next.js 14 App Router (frontend), Supabase (database + auth + storage), Tailwind CSS (styling), archiver (ZIP generation)
 - 003-ora-facciamo-il: Added TypeScript 5.3+ (Node.js 20 LTS backend, React 18 frontend) + Express.js (backend), Next.js 14 App Router (frontend), Supabase (database + auth + storage), Tailwind CSS (styling)
 - 002-facciamo-tutti-gli: Added TypeScript 5.3+ (Node.js 20 LTS backend, React 18 frontend)
-- 001-voglio-creare-l: Added TypeScript 5.3+ (Node.js 20 LTS for backend, React 18 for frontend) + Next.js 14 (frontend), Express.js (backend API), Supabase (database + auth), Tailwind CSS (styling)
 
 <!-- MANUAL ADDITIONS START -->
 
@@ -164,6 +165,171 @@ const defaultValues = mode === 'edit' ? initialData : {};
 ```
 
 **Benefits**: DRY, consistent validation, easier maintenance
+
+## Feature-Specific Patterns (004-facciamo-la-pagina)
+
+### Public Event Access with RLS Token Validation
+**Pattern**: Dual RLS policies for public/private event access
+**Location**: `backend/migrations/004-public-read-policies.sql`, `backend/src/services/publicEventService.ts`
+
+**RLS Policies**:
+```sql
+-- Public events accessible to all
+CREATE POLICY "public_events_read" ON events FOR SELECT
+USING (visibility = 'public');
+
+-- Private events require valid token
+CREATE POLICY "private_events_read_with_token" ON events FOR SELECT
+USING (
+  visibility = 'private' AND id IN (
+    SELECT event_id FROM access_tokens
+    WHERE id = app.current_token_id() AND expires_at > NOW()
+  )
+);
+```
+
+**Token Validation Function**:
+```typescript
+export async function validateToken(slug: string, token: string) {
+  // Validate format (21 characters)
+  if (!token || token.length !== 21) {
+    return { valid: false, message: 'Token must be exactly 21 characters' };
+  }
+
+  // Check token in database
+  const { data: tokenData } = await supabase
+    .from('access_tokens')
+    .select('id, token_type, expires_at')
+    .eq('token', token)
+    .eq('event_id', event.id)
+    .single();
+
+  // Update usage tracking
+  await supabase.from('access_tokens').update({
+    last_used_at: new Date().toISOString(),
+    use_count: supabase.rpc('increment', { row_id: tokenData.id })
+  });
+
+  return { valid: true, token_id: tokenData.id };
+}
+```
+
+**Benefits**: Database-level access control, automatic token tracking
+
+### ZIP Streaming for Large File Downloads
+**Pattern**: Stream ZIP generation without memory buffering
+**Location**: `backend/src/services/zipGenerationService.ts`
+
+```typescript
+import archiver from 'archiver';
+
+export async function generateSpeechZip(speechId: string, res: Response) {
+  // Set response headers for ZIP download
+  res.setHeader('Content-Type', 'application/zip');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}.zip"`);
+
+  // Create streaming ZIP archive
+  const archive = archiver('zip', { zlib: { level: 6 } });
+  archive.pipe(res);
+
+  // Add files one by one
+  for (const slide of slides) {
+    const { data: signedUrlData } = await supabase.storage
+      .from('slides')
+      .createSignedUrl(slide.storage_path, 60);
+    const response = await fetch(signedUrlData.signedUrl);
+    const buffer = await response.buffer();
+    archive.append(buffer, { name: slide.filename });
+  }
+
+  await archive.finalize();
+}
+```
+
+**Benefits**: Handles large file sets, low memory usage, streaming response
+
+### Rate Limiting for Public API Endpoints
+**Pattern**: express-rate-limit with IP-based throttling
+**Location**: `backend/src/middleware/downloadRateLimit.ts`
+
+```typescript
+export const downloadRateLimit = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 50, // 50 requests per hour per IP
+  message: {
+    error: 'Too many download requests',
+    message: 'You have exceeded the download limit. Please try again later.'
+  },
+  standardHeaders: true, // Return rate limit info in headers
+  handler: (req, res) => {
+    res.status(429).json({
+      error: 'Too many download requests',
+      retryAfter: Math.ceil(60 * 60)
+    });
+  }
+});
+```
+
+**Usage in routes**:
+```typescript
+router.get('/slides/:id/download', downloadRateLimit, async (req, res) => {
+  // Download logic
+});
+```
+
+**Benefits**: Prevents abuse, automatic retry-after headers, per-IP tracking
+
+### Server Components with Error Boundaries
+**Pattern**: Next.js Server Components with typed error handling
+**Location**: `frontend/src/app/events/[slug]/page.tsx`
+
+```typescript
+export default async function PublicEventPage({ params, searchParams }: PageProps) {
+  try {
+    const eventData = await fetchPublicEvent(params.slug, searchParams.token);
+
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <EventHeader event={eventData.event} />
+        <PublicMetrics slug={params.slug} initialMetrics={eventData.metrics} />
+        <SessionList sessions={eventData.sessions} />
+      </div>
+    );
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+    // Handle specific error types
+    if (errorMessage.includes('private event')) {
+      return <TokenForm slug={params.slug} />;
+    }
+    if (errorMessage.includes('not found')) {
+      notFound(); // Next.js 404 page
+    }
+
+    // Generic error UI
+    return <ErrorDisplay message={errorMessage} />;
+  }
+}
+```
+
+**Benefits**: Type-safe error handling, proper HTTP status codes, SEO-friendly
+
+### sessionStorage for Client-Side Token Persistence
+**Pattern**: Browser storage for temporary auth tokens
+**Location**: `frontend/src/components/public/TokenForm.tsx`
+
+```typescript
+const handleSuccess = (tokenId: string) => {
+  // Store token in sessionStorage (cleared on tab close)
+  sessionStorage.setItem(`event-token-${slug}`, token);
+  sessionStorage.setItem(`event-token-id-${slug}`, tokenId);
+
+  // Redirect with token in URL for server-side validation
+  router.push(`/events/${slug}?token=${token}`);
+};
+```
+
+**Benefits**: Persists across page refreshes, auto-clears on tab close, no cookies needed
 
 ## Testing Patterns
 
