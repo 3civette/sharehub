@@ -26,6 +26,12 @@ import publicRoutes from './routes/publicRoutes';
 // Public Event Page routes (Feature 004)
 import publicEventRoutes from './routes/publicEventRoutes';
 
+// Event Dashboard routes (Feature 005)
+import eventDashboardRoutes from './routes/eventDashboard';
+import adminSessionRoutes from './routes/admin-sessions';
+import adminSpeechRoutes from './routes/admin-speeches';
+import adminSlideRoutes from './routes/admin-slides';
+
 const app = express();
 const PORT = process.env.PORT || 3001;
 
@@ -56,6 +62,12 @@ app.use('/api', publicRoutes);
 // Public Event Page routes (Feature 004 - no auth required)
 app.use('/api/public', publicEventRoutes);
 
+// Event Dashboard routes (Feature 005 - admin auth required)
+app.use('/api/admin/events', eventDashboardRoutes);
+app.use('/api/admin', adminSessionRoutes);
+app.use('/api/admin', adminSpeechRoutes);
+app.use('/api/admin', adminSlideRoutes);
+
 // Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -69,3 +81,4 @@ app.listen(PORT, () => {
 });
 
 export default app;
+

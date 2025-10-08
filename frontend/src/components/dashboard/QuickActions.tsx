@@ -6,7 +6,7 @@ export default function QuickActions() {
   return (
     <div className="bg-white rounded-lg shadow-md p-6">
       <h3 className="text-lg font-semibold text-gray-900 mb-4">Azioni Rapide</h3>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Link
           href="/admin/events/create"
           className="flex items-center gap-3 p-4 rounded-lg border-2 border-blue-200 bg-blue-50 hover:bg-blue-100 hover:border-blue-300 transition-all group"
@@ -19,21 +19,6 @@ export default function QuickActions() {
           <div>
             <p className="font-semibold text-gray-900">Crea Nuovo Evento</p>
             <p className="text-sm text-gray-600">Configura un nuovo evento</p>
-          </div>
-        </Link>
-
-        <Link
-          href="/admin/events"
-          className="flex items-center gap-3 p-4 rounded-lg border-2 border-gray-200 bg-gray-50 hover:bg-gray-100 hover:border-gray-300 transition-all group"
-        >
-          <div className="p-2 bg-gray-500 text-white rounded-lg group-hover:scale-110 transition-transform">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-          </div>
-          <div>
-            <p className="font-semibold text-gray-900">Visualizza Tutti gli Eventi</p>
-            <p className="text-sm text-gray-600">Gestisci eventi esistenti</p>
           </div>
         </Link>
 

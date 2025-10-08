@@ -19,6 +19,8 @@ interface Event {
   created_by: string;
   created_at: string;
   updated_at: string;
+  sessions_count?: number;
+  speeches_count?: number;
 }
 
 interface EventListProps {
@@ -209,6 +211,16 @@ export default function EventList({ events, onEventClick }: EventListProps) {
                         {event.description}
                       </div>
                     )}
+                    <div className="flex gap-3 mt-1 text-xs text-gray-600">
+                      <span className="flex items-center gap-1">
+                        <span>📂</span>
+                        {event.sessions_count || 0} {event.sessions_count === 1 ? 'sessione' : 'sessioni'}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <span>💬</span>
+                        {event.speeches_count || 0} {event.speeches_count === 1 ? 'intervento' : 'interventi'}
+                      </span>
+                    </div>
                   </td>
 
                   {/* Date */}
@@ -265,6 +277,13 @@ export default function EventList({ events, onEventClick }: EventListProps) {
                   {/* Actions */}
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <div className="flex items-center justify-end gap-3">
+                      <a
+                        href={`/admin/events/${event.id}/dashboard`}
+                        className="text-purple-600 hover:text-purple-900 transition-colors"
+                        title="Apri dashboard evento"
+                      >
+                        Dashboard
+                      </a>
                       <a
                         href={`/events/${event.slug}`}
                         target="_blank"
