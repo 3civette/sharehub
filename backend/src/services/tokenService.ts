@@ -1,10 +1,11 @@
 /**
  * Token Service
  * Purpose: Token generation, validation, and usage tracking
- * Feature: 003-ora-facciamo-il
+ * Feature: 003-ora-facciamo-il (enhanced by 005-ora-bisogna-implementare)
  */
 
 import { nanoid } from 'nanoid';
+import QRCode from 'qrcode';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import type { AccessToken } from '../models/accessToken';
 import { isTokenValid, isTokenExpired } from '../models/accessToken';
@@ -30,6 +31,7 @@ export class TokenService {
 
   /**
    * Validate token and check expiration
+   * Feature 005: Also checks for revoked status
    * @param token - Token string to validate
    * @param eventId - Optional event ID to verify token belongs to event
    * @returns Token data if valid, null if invalid/expired
@@ -63,6 +65,14 @@ export class TokenService {
       }
 
       const accessToken = data as AccessToken;
+
+      // Feature 005: Check if token is revoked
+      if (accessToken.revoked_at) {
+        return {
+          valid: false,
+          error: 'Token has been revoked',
+        };
+      }
 
       // Check expiration
       if (isTokenExpired(accessToken)) {
@@ -228,6 +238,132 @@ export class TokenService {
     error?: string;
   }> {
     return this.validateToken(token, eventId);
+  }
+
+  /**
+   * Feature 005: Generate QR code for token
+   * @param token - Token string
+   * @param eventSlug - Event slug for URL construction
+   * @param format - QR code format (PNG data URL or SVG string)
+   * @param size - QR code size in pixels (default 300)
+   * @returns QR code as data URL or SVG string
+   */
+  async generateQRCode(
+    token: string,
+    eventSlug: string,
+    format: 'png' | 'svg' = 'png',
+    size: number = 300
+  ): Promise<string> {
+    const publicUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/events/${eventSlug}?token=${token}`;
+
+    try {
+      if (format === 'svg') {
+        return await QRCode.toString(publicUrl, {
+          type: 'svg',
+          width: size,
+          margin: 2,
+        });
+      } else {
+        // PNG data URL
+        return await QRCode.toDataURL(publicUrl, {
+          width: size,
+          margin: 2,
+          color: {
+            dark: '#000000',
+            light: '#FFFFFF',
+          },
+        });
+      }
+    } catch (err) {
+      throw new Error(`QR code generation failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Feature 005: Store QR code data URL in token record
+   * @param tokenId - Token UUID
+   * @param qrCodeDataUrl - QR code data URL (PNG)
+   * @returns Success boolean
+   */
+  async saveQRCode(tokenId: string, qrCodeDataUrl: string): Promise<boolean> {
+    try {
+      const { error } = await this.supabase
+        .from('access_tokens')
+        .update({ qr_code_data_url: qrCodeDataUrl })
+        .eq('id', tokenId);
+
+      return !error;
+    } catch (err) {
+      console.error('Failed to save QR code:', err);
+      return false;
+    }
+  }
+
+  /**
+   * Feature 005: Revoke a token (soft delete with audit trail)
+   * @param tokenId - Token UUID
+   * @param revokedBy - Admin ID who revoked the token
+   * @returns Revoked token data
+   */
+  async revokeToken(tokenId: string, revokedBy: string): Promise<AccessToken> {
+    const { data, error } = await this.supabase
+      .from('access_tokens')
+      .update({
+        revoked_at: new Date().toISOString(),
+        revoked_by: revokedBy,
+      })
+      .eq('id', tokenId)
+      .select()
+      .single();
+
+    if (error) {
+      throw new Error(`Failed to revoke token: ${error.message}`);
+    }
+
+    return data as AccessToken;
+  }
+
+  /**
+   * Feature 005: Get tokens with status filter (active/revoked/expired)
+   * @param eventId - Event UUID
+   * @param status - Filter by token status
+   * @returns Filtered array of access tokens
+   */
+  async getTokensByStatus(
+    eventId: string,
+    status?: 'active' | 'revoked' | 'expired' | 'all'
+  ): Promise<AccessToken[]> {
+    let query = this.supabase
+      .from('access_tokens')
+      .select('*')
+      .eq('event_id', eventId)
+      .order('created_at', { ascending: false });
+
+    if (status === 'revoked') {
+      query = query.not('revoked_at', 'is', null);
+    } else if (status === 'active') {
+      query = query.is('revoked_at', null).gte('expires_at', new Date().toISOString());
+    } else if (status === 'expired') {
+      query = query.is('revoked_at', null).lt('expires_at', new Date().toISOString());
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      throw new Error(`Failed to get tokens: ${error.message}`);
+    }
+
+    return data as AccessToken[];
+  }
+
+  /**
+   * Feature 005: Format token URL for copy-to-clipboard
+   * @param token - Token string
+   * @param eventSlug - Event slug
+   * @returns Full public URL with token parameter
+   */
+  formatTokenUrl(token: string, eventSlug: string): string {
+    return `${process.env.FRONTEND_URL || 'http://localhost:3000'}/events/${eventSlug}?token=${token}`;
   }
 }
 

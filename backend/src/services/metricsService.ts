@@ -248,6 +248,110 @@ export class MetricsService {
 
     return true;
   }
+
+  /**
+   * Feature 005: Track photo view
+   * @param eventId - Event UUID
+   * @param tenantId - Tenant UUID
+   * @param photoId - Photo UUID
+   * @returns Updated metrics
+   */
+  async trackPhotoView(eventId: string, tenantId: string, photoId: string): Promise<void> {
+    await this.setTenantContext(tenantId);
+
+    // Get current metrics
+    const { data: current } = await this.supabase
+      .from('event_metrics')
+      .select('*')
+      .eq('event_id', eventId)
+      .single();
+
+    if (!current) {
+      return; // Silently skip if metrics don't exist
+    }
+
+    const metrics = current as EventMetrics;
+
+    // Add timeline entry
+    const updates = addTimelineEntry(metrics, {
+      timestamp: new Date().toISOString(),
+      actor_type: 'anonymous',
+      action: 'photo_view'
+    });
+
+    await this.supabase
+      .from('event_metrics')
+      .update(updates)
+      .eq('event_id', eventId);
+  }
+
+  /**
+   * Feature 005: Track session view
+   * @param eventId - Event UUID
+   * @param tenantId - Tenant UUID
+   * @param sessionId - Session UUID
+   * @returns Updated metrics
+   */
+  async trackSessionView(eventId: string, tenantId: string, sessionId: string): Promise<void> {
+    await this.setTenantContext(tenantId);
+
+    const { data: current } = await this.supabase
+      .from('event_metrics')
+      .select('*')
+      .eq('event_id', eventId)
+      .single();
+
+    if (!current) {
+      return;
+    }
+
+    const metrics = current as EventMetrics;
+
+    const updates = addTimelineEntry(metrics, {
+      timestamp: new Date().toISOString(),
+      actor_type: 'anonymous',
+      action: 'session_view'
+    });
+
+    await this.supabase
+      .from('event_metrics')
+      .update(updates)
+      .eq('event_id', eventId);
+  }
+
+  /**
+   * Feature 005: Track speech view
+   * @param eventId - Event UUID
+   * @param tenantId - Tenant UUID
+   * @param speechId - Speech UUID
+   * @returns Updated metrics
+   */
+  async trackSpeechView(eventId: string, tenantId: string, speechId: string): Promise<void> {
+    await this.setTenantContext(tenantId);
+
+    const { data: current } = await this.supabase
+      .from('event_metrics')
+      .select('*')
+      .eq('event_id', eventId)
+      .single();
+
+    if (!current) {
+      return;
+    }
+
+    const metrics = current as EventMetrics;
+
+    const updates = addTimelineEntry(metrics, {
+      timestamp: new Date().toISOString(),
+      actor_type: 'anonymous',
+      action: 'speech_view'
+    });
+
+    await this.supabase
+      .from('event_metrics')
+      .update(updates)
+      .eq('event_id', eventId);
+  }
 }
 
 // Export singleton instance

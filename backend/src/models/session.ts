@@ -19,14 +19,21 @@ export interface Session {
   // Attributes
   title: string;
   description?: string;
-  start_time?: string; // ISO timestamp
+  start_time?: string; // ISO timestamp (Feature 003 - legacy)
+  scheduled_time?: string; // ISO timestamp (Feature 005 - replaces start_time)
 
-  // Ordering
-  display_order: number;
+  // Ordering (Feature 005: nullable for smart ordering)
+  display_order: number | null;
 
   // Audit
   created_at: string; // ISO timestamp
   updated_at: string; // ISO timestamp
+}
+
+// Feature 005: Session with speeches for hierarchical queries
+export interface SessionWithSpeeches extends Session {
+  speeches: any[]; // Will be typed with Speech[] when circular dep resolved
+  speech_count: number;
 }
 
 // =============================================================================
@@ -44,12 +51,15 @@ export const createSessionSchema = z.object({
     .max(500, 'Description must be at most 500 characters')
     .optional()
     .nullable(),
-  start_time: z.string().datetime().optional().nullable(),
+  start_time: z.string().datetime().optional().nullable(), // Feature 003 legacy
+  scheduled_time: z.string().datetime().optional().nullable(), // Feature 005 preferred
   display_order: z
     .number()
     .int()
     .nonnegative('Display order must be non-negative')
-    .default(0),
+    .optional()
+    .nullable() // Feature 005: nullable for auto-ordering
+    .default(null),
 });
 
 export type CreateSessionInput = z.infer<typeof createSessionSchema>;
@@ -60,8 +70,9 @@ export type CreateSessionInput = z.infer<typeof createSessionSchema>;
 export const updateSessionSchema = z.object({
   title: z.string().min(1).max(100).optional(),
   description: z.string().max(500).optional().nullable(),
-  start_time: z.string().datetime().optional().nullable(),
-  display_order: z.number().int().nonnegative().optional(),
+  start_time: z.string().datetime().optional().nullable(), // Feature 003 legacy
+  scheduled_time: z.string().datetime().optional().nullable(), // Feature 005 preferred
+  display_order: z.number().int().nonnegative().optional().nullable(), // Feature 005: nullable
 });
 
 export type UpdateSessionInput = z.infer<typeof updateSessionSchema>;
@@ -98,14 +109,41 @@ export function validateDisplayOrderUnique(
  */
 export function getNextDisplayOrder(sessions: Session[]): number {
   if (sessions.length === 0) return 0;
-  return Math.max(...sessions.map((s) => s.display_order)) + 1;
+  const orders = sessions.map((s) => s.display_order ?? 0);
+  return Math.max(...orders) + 1;
 }
 
 /**
  * Sort sessions by display_order (ascending)
+ * Feature 005: Handles nullable display_order
  */
 export function sortSessionsByOrder(sessions: Session[]): Session[] {
-  return [...sessions].sort((a, b) => a.display_order - b.display_order);
+  return [...sessions].sort((a, b) => {
+    const orderA = a.display_order ?? 999999;
+    const orderB = b.display_order ?? 999999;
+    return orderA - orderB;
+  });
+}
+
+/**
+ * Feature 005: Determine ordering mode (chronological vs manual)
+ */
+export function getOrderingMode(sessions: Session[]): 'chronological' | 'manual' {
+  const hasManualOrder = sessions.some(s => s.display_order !== null);
+  return hasManualOrder ? 'manual' : 'chronological';
+}
+
+/**
+ * Feature 005: Sort sessions by smart ordering logic
+ * - If display_order is set (manual): use display_order
+ * - If display_order is null (auto): use scheduled_time chronologically
+ */
+export function sortSessionsSmart(sessions: Session[]): Session[] {
+  return [...sessions].sort((a, b) => {
+    const orderA = a.display_order ?? (a.scheduled_time ? new Date(a.scheduled_time).getTime() / 1000 : 999999);
+    const orderB = b.display_order ?? (b.scheduled_time ? new Date(b.scheduled_time).getTime() / 1000 : 999999);
+    return orderA - orderB;
+  });
 }
 
 /**

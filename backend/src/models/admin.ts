@@ -7,11 +7,12 @@
 export interface Event {
   id: string;
   tenant_id: string;
-  event_name: string;
-  event_date: string;  // ISO date (YYYY-MM-DD)
+  name: string;
+  date: string;  // ISO date (YYYY-MM-DD)
+  slug: string;
   description: string | null;
   visibility: 'public' | 'private';
-  status: 'active' | 'past';  // Computed from event_date
+  status: 'draft' | 'upcoming' | 'ongoing' | 'past';  // Computed from date
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -23,15 +24,15 @@ export interface Event {
 }
 
 export interface EventCreateInput {
-  event_name: string;
-  event_date: string;
+  name: string;
+  date: string;
   description?: string;
   visibility: 'public' | 'private';
 }
 
 export interface EventUpdateInput {
-  event_name?: string;
-  event_date?: string;
+  name?: string;
+  date?: string;
   description?: string;
   visibility?: 'public' | 'private';
 }

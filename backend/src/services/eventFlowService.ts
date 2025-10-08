@@ -99,9 +99,10 @@ export class EventFlowService {
 
   /**
    * Get event by ID with full hierarchy
+   * Feature 005: Enhanced with photos and smart ordering
    * @param eventId - Event UUID
    * @param tenantId - Tenant UUID for RLS
-   * @returns Event with sessions, speeches, and slides
+   * @returns Event with photos, sessions, speeches, and slides
    */
   async getEventWithHierarchy(eventId: string, tenantId: string): Promise<any> {
     await this.setTenantContext(tenantId);
@@ -117,31 +118,54 @@ export class EventFlowService {
       throw new Error('Event not found');
     }
 
-    // Get sessions with speeches and slides
-    const { data: sessions, error: sessionsError } = await this.supabase
-      .from('sessions')
+    // Feature 005: Get event photos (cover + gallery)
+    const { data: photos } = await this.supabase
+      .from('event_photos')
       .select('*')
       .eq('event_id', eventId)
       .order('display_order', { ascending: true });
+
+    const cover = photos?.find(p => p.is_cover) || null;
+    const gallery = photos?.filter(p => !p.is_cover) || [];
+
+    // Get sessions (use raw query, apply smart ordering in-memory)
+    const { data: sessions, error: sessionsError } = await this.supabase
+      .from('sessions')
+      .select('*')
+      .eq('event_id', eventId);
 
     if (sessionsError) {
       throw new Error(`Failed to load sessions: ${sessionsError.message}`);
     }
 
+    // Feature 005: Apply smart ordering to sessions
+    const sortedSessions = (sessions || []).sort((a, b) => {
+      const orderA = a.display_order ?? (a.scheduled_time ? new Date(a.scheduled_time).getTime() / 1000 : 999999);
+      const orderB = b.display_order ?? (b.scheduled_time ? new Date(b.scheduled_time).getTime() / 1000 : 999999);
+      return orderA - orderB;
+    });
+
     // For each session, get speeches
     const sessionsWithContent = await Promise.all(
-      (sessions || []).map(async (session) => {
+      sortedSessions.map(async (session) => {
         const { data: speeches } = await this.supabase
           .from('speeches')
           .select('*')
-          .eq('session_id', session.id)
-          .order('display_order', { ascending: true });
+          .eq('session_id', session.id);
 
-        // For each speech, get slides
+        // Feature 005: Apply smart ordering to speeches
+        const sortedSpeeches = (speeches || []).sort((a, b) => {
+          const orderA = a.display_order ?? (a.scheduled_time ? new Date(a.scheduled_time).getTime() / 1000 : 999999);
+          const orderB = b.display_order ?? (b.scheduled_time ? new Date(b.scheduled_time).getTime() / 1000 : 999999);
+          return orderA - orderB;
+        });
+
+        // For each speech, get slides with enriched metadata
         const speechesWithSlides = await Promise.all(
-          (speeches || []).map(async (speech) => {
+          sortedSpeeches.map(async (speech) => {
+            // Feature 005: Use slides_with_metadata view for enriched data
             const { data: slides } = await this.supabase
-              .from('slides')
+              .from('slides_with_metadata')
               .select('*')
               .eq('speech_id', speech.id)
               .order('display_order', { ascending: true });
@@ -162,6 +186,11 @@ export class EventFlowService {
 
     return {
       event,
+      photos: {
+        cover,
+        gallery,
+        total: photos?.length || 0
+      },
       sessions: sessionsWithContent,
     };
   }

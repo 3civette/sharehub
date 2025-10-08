@@ -1,12 +1,12 @@
 /**
  * Session Service
  * Purpose: Business logic for session management within events
- * Feature: 003-ora-facciamo-il
+ * Feature: 003-ora-facciamo-il (enhanced by 005-ora-bisogna-implementare)
  */
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import type { Session, CreateSessionInput, UpdateSessionInput } from '../models/session';
-import { getNextDisplayOrder } from '../models/session';
+import type { Session, SessionWithSpeeches, CreateSessionInput, UpdateSessionInput } from '../models/session';
+import { getNextDisplayOrder, sortSessionsSmart } from '../models/session';
 
 // Initialize Supabase client
 const supabaseUrl = process.env.SUPABASE_URL!;
@@ -32,6 +32,7 @@ export class SessionService {
 
   /**
    * Create a new session
+   * Feature 005: Supports scheduled_time with nullable display_order for auto-ordering
    * @param tenantId - Tenant UUID
    * @param input - Session creation data
    * @returns Created session
@@ -39,9 +40,12 @@ export class SessionService {
   async createSession(tenantId: string, input: CreateSessionInput): Promise<Session> {
     await this.setTenantContext(tenantId);
 
-    // If display_order not provided, get next available
+    // Feature 005: display_order is nullable for chronological auto-ordering
+    // If not provided, keep as null (will be ordered by scheduled_time)
     let displayOrder = input.display_order;
-    if (displayOrder === undefined || displayOrder === null) {
+
+    // Legacy behavior: if explicitly requesting next order, calculate it
+    if (displayOrder === undefined && !input.scheduled_time) {
       const existing = await this.listSessions(input.event_id, tenantId);
       displayOrder = getNextDisplayOrder(existing);
     }
@@ -53,8 +57,9 @@ export class SessionService {
         tenant_id: tenantId,
         title: input.title,
         description: input.description,
-        start_time: input.start_time,
-        display_order: displayOrder,
+        start_time: input.start_time, // Feature 003 legacy
+        scheduled_time: input.scheduled_time, // Feature 005 preferred
+        display_order: displayOrder ?? null, // Feature 005: nullable
       })
       .select()
       .single();
@@ -68,6 +73,7 @@ export class SessionService {
 
   /**
    * Update session
+   * Feature 005: Auto-clears display_order if scheduled_time changes (trigger handles this)
    * @param sessionId - Session UUID
    * @param tenantId - Tenant UUID
    * @param input - Update data
@@ -80,6 +86,7 @@ export class SessionService {
   ): Promise<Session> {
     await this.setTenantContext(tenantId);
 
+    // Feature 005: If scheduled_time is being updated, database trigger will auto-clear display_order
     const { data, error } = await this.supabase
       .from('sessions')
       .update(input)
@@ -95,13 +102,30 @@ export class SessionService {
   }
 
   /**
-   * Delete session (cascades to speeches and slides)
+   * Delete session
+   * Feature 005: Checks for speeches first, throws error if any exist (safeguard)
    * @param sessionId - Session UUID
    * @param tenantId - Tenant UUID
-   * @returns Success boolean
+   * @returns Success boolean with speech count
    */
-  async deleteSession(sessionId: string, tenantId: string): Promise<boolean> {
+  async deleteSession(sessionId: string, tenantId: string): Promise<{ deleted: boolean; speech_count: number }> {
     await this.setTenantContext(tenantId);
+
+    // Feature 005: Check for speeches first (delete safeguard)
+    const { data: speeches, error: speechError } = await this.supabase
+      .from('speeches')
+      .select('id')
+      .eq('session_id', sessionId);
+
+    if (speechError) {
+      throw new Error(`Failed to check speeches: ${speechError.message}`);
+    }
+
+    const speechCount = speeches?.length || 0;
+
+    if (speechCount > 0) {
+      throw new Error(`Cannot delete session with ${speechCount} speeches. Delete speeches first.`);
+    }
 
     const { error } = await this.supabase.from('sessions').delete().eq('id', sessionId);
 
@@ -109,14 +133,15 @@ export class SessionService {
       throw new Error(`Failed to delete session: ${error.message}`);
     }
 
-    return true;
+    return { deleted: true, speech_count: speechCount };
   }
 
   /**
    * List sessions for an event
+   * Feature 005: Smart ordering using sortSessionsSmart helper
    * @param eventId - Event UUID
    * @param tenantId - Tenant UUID
-   * @returns Array of sessions ordered by display_order
+   * @returns Array of sessions ordered by smart logic (manual display_order or scheduled_time)
    */
   async listSessions(eventId: string, tenantId: string): Promise<Session[]> {
     await this.setTenantContext(tenantId);
@@ -124,14 +149,14 @@ export class SessionService {
     const { data, error } = await this.supabase
       .from('sessions')
       .select('*')
-      .eq('event_id', eventId)
-      .order('display_order', { ascending: true });
+      .eq('event_id', eventId);
 
     if (error) {
       throw new Error(`Failed to list sessions: ${error.message}`);
     }
 
-    return (data || []) as Session[];
+    // Feature 005: Use smart ordering logic from model helper
+    return sortSessionsSmart((data || []) as Session[]);
   }
 
   /**
@@ -186,12 +211,13 @@ export class SessionService {
   }
 
   /**
-   * Get session with speeches and slides
+   * Get session with speeches (hierarchical query)
+   * Feature 005: Uses SessionWithSpeeches type, applies smart ordering to speeches
    * @param sessionId - Session UUID
    * @param tenantId - Tenant UUID
-   * @returns Session with nested speeches and slides
+   * @returns Session with nested speeches and slide count
    */
-  async getSessionWithContent(sessionId: string, tenantId: string): Promise<any> {
+  async getSessionWithContent(sessionId: string, tenantId: string): Promise<SessionWithSpeeches> {
     await this.setTenantContext(tenantId);
 
     const { data: session, error: sessionError } = await this.supabase
@@ -204,37 +230,30 @@ export class SessionService {
       throw new Error('Session not found');
     }
 
-    // Get speeches
+    // Get speeches with slide counts
     const { data: speeches, error: speechesError } = await this.supabase
       .from('speeches')
-      .select('*')
-      .eq('session_id', sessionId)
-      .order('display_order', { ascending: true });
+      .select(`
+        *,
+        slides:slides(count)
+      `)
+      .eq('session_id', sessionId);
 
     if (speechesError) {
       throw new Error(`Failed to load speeches: ${speechesError.message}`);
     }
 
-    // For each speech, get slides
-    const speechesWithSlides = await Promise.all(
-      (speeches || []).map(async (speech) => {
-        const { data: slides } = await this.supabase
-          .from('slides')
-          .select('*')
-          .eq('speech_id', speech.id)
-          .order('display_order', { ascending: true });
-
-        return {
-          ...speech,
-          slides: slides || [],
-        };
-      })
-    );
+    // Feature 005: Apply smart ordering to speeches (will use sortSpeechesSmart in SpeechService)
+    const sortedSpeeches = (speeches || []).map(speech => ({
+      ...speech,
+      slide_count: speech.slides?.[0]?.count || 0
+    }));
 
     return {
       ...session,
-      speeches: speechesWithSlides,
-    };
+      speeches: sortedSpeeches,
+      speech_count: sortedSpeeches.length
+    } as SessionWithSpeeches;
   }
 }
 

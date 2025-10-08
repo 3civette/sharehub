@@ -145,8 +145,8 @@ router.delete(
 
       res.json({
         message: 'Speech deleted successfully',
-        slideCount: result.slideCount,
-        warning: result.slideCount > 0 ? `${result.slideCount} slide(s) were also deleted` : null,
+        slideCount: result.slide_count,
+        warning: result.slide_count > 0 ? `${result.slide_count} slide(s) were also deleted` : null,
       });
     } catch (error) {
       console.error('Delete speech error:', error);

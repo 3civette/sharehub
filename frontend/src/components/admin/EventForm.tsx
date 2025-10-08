@@ -9,26 +9,27 @@ import React, { useState, useEffect } from 'react';
 interface Event {
   id: string;
   tenant_id: string;
-  event_name: string;
-  event_date: string; // ISO date
+  name: string;
+  date: string; // ISO date
+  slug: string;
   description: string | null;
   visibility: 'public' | 'private';
-  status: 'active' | 'past';
+  status: 'draft' | 'upcoming' | 'ongoing' | 'past';
   created_by: string;
   created_at: string;
   updated_at: string;
 }
 
 interface EventCreateInput {
-  event_name: string;
-  event_date: string;
+  name: string;
+  date: string;
   description?: string;
   visibility: 'public' | 'private';
 }
 
 interface EventUpdateInput {
-  event_name?: string;
-  event_date?: string;
+  name?: string;
+  date?: string;
   description?: string;
   visibility?: 'public' | 'private';
 }
@@ -47,8 +48,8 @@ export default function EventForm({
   isReadOnly = false
 }: EventFormProps) {
   const [formData, setFormData] = useState({
-    event_name: initialData?.event_name || '',
-    event_date: initialData?.event_date || '',
+    name: initialData?.name || '',
+    date: initialData?.date || '',
     description: initialData?.description || '',
     visibility: (initialData?.visibility || 'public') as 'public' | 'private'
   });
@@ -59,8 +60,8 @@ export default function EventForm({
   useEffect(() => {
     if (initialData) {
       setFormData({
-        event_name: initialData.event_name,
-        event_date: initialData.event_date,
+        name: initialData.name,
+        date: initialData.date,
         description: initialData.description || '',
         visibility: initialData.visibility
       });
@@ -69,7 +70,7 @@ export default function EventForm({
 
   const validateField = (name: string, value: string): string | null => {
     switch (name) {
-      case 'event_name':
+      case 'name':
         if (!value.trim()) {
           return 'Event name is required';
         }
@@ -78,7 +79,7 @@ export default function EventForm({
         }
         return null;
 
-      case 'event_date':
+      case 'date':
         if (!value) {
           return 'Event date is required';
         }
@@ -162,8 +163,8 @@ export default function EventForm({
 
     // Prepare data for submission
     const submitData: EventCreateInput | EventUpdateInput = {
-      event_name: formData.event_name,
-      event_date: formData.event_date,
+      name: formData.name,
+      date: formData.date,
       description: formData.description || undefined,
       visibility: formData.visibility
     };
@@ -180,52 +181,52 @@ export default function EventForm({
     <form onSubmit={handleSubmit} className="space-y-6">
       {/* Event Name */}
       <div>
-        <label htmlFor="event_name" className="block text-sm font-medium text-gray-700">
+        <label htmlFor="name" className="block text-sm font-medium text-gray-700">
           Event Name *
         </label>
         <input
           type="text"
-          id="event_name"
-          name="event_name"
-          value={formData.event_name}
+          id="name"
+          name="name"
+          value={formData.name}
           onChange={handleChange}
           onBlur={handleBlur}
           disabled={isReadOnly}
           className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-            errors.event_name && touched.event_name
+            errors.name && touched.name
               ? 'border-red-500'
               : 'border-gray-300'
           } ${isReadOnly ? 'bg-gray-100 cursor-not-allowed' : ''}`}
           placeholder="Enter event name"
           maxLength={255}
         />
-        {errors.event_name && touched.event_name && (
-          <p className="mt-1 text-sm text-red-600">{errors.event_name}</p>
+        {errors.name && touched.name && (
+          <p className="mt-1 text-sm text-red-600">{errors.name}</p>
         )}
       </div>
 
       {/* Event Date */}
       <div>
-        <label htmlFor="event_date" className="block text-sm font-medium text-gray-700">
+        <label htmlFor="date" className="block text-sm font-medium text-gray-700">
           Event Date *
         </label>
         <input
           type="date"
-          id="event_date"
-          name="event_date"
-          value={formData.event_date}
+          id="date"
+          name="date"
+          value={formData.date}
           onChange={handleChange}
           onBlur={handleBlur}
           disabled={isReadOnly}
           min={getTodayDate()}
           className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-            errors.event_date && touched.event_date
+            errors.date && touched.date
               ? 'border-red-500'
               : 'border-gray-300'
           } ${isReadOnly ? 'bg-gray-100 cursor-not-allowed' : ''}`}
         />
-        {errors.event_date && touched.event_date && (
-          <p className="mt-1 text-sm text-red-600">{errors.event_date}</p>
+        {errors.date && touched.date && (
+          <p className="mt-1 text-sm text-red-600">{errors.date}</p>
         )}
       </div>
 

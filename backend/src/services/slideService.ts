@@ -202,6 +202,29 @@ export class SlideService {
   }
 
   /**
+   * Feature 005: Get slides with enriched metadata (speaker name, speech title)
+   * @param speechId - Speech UUID
+   * @param tenantId - Tenant UUID
+   * @returns Array of slides with speaker and speech metadata
+   */
+  async getSlidesWithSpeechData(speechId: string, tenantId: string): Promise<any[]> {
+    await this.setTenantContext(tenantId);
+
+    // Use the slides_with_metadata view created in migration
+    const { data, error } = await this.supabase
+      .from('slides_with_metadata')
+      .select('*')
+      .eq('speech_id', speechId)
+      .order('display_order', { ascending: true });
+
+    if (error) {
+      throw new Error(`Failed to list slides with metadata: ${error.message}`);
+    }
+
+    return data || [];
+  }
+
+  /**
    * Generate ZIP file for event slides (hierarchical structure)
    * @param eventId - Event UUID
    * @param tenantId - Tenant UUID

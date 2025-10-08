@@ -26,6 +26,12 @@ import publicRoutes from './routes/publicRoutes';
 // Public Event Page routes (Feature 004)
 import publicEventRoutes from './routes/publicEventRoutes';
 
+// Feature 005 - Enhanced Event Management routes
+import eventPhotosRouter from './routes/eventPhotos';
+import sessionsRouter from './routes/sessions';
+import speechesRouter from './routes/speeches';
+import tokensRouter from './routes/tokens';
+
 const app = express();
 const PORT = process.env.PORT || 3001;
 
@@ -55,6 +61,13 @@ app.use('/api', publicRoutes);
 
 // Public Event Page routes (Feature 004 - no auth required)
 app.use('/api/public', publicEventRoutes);
+
+// Feature 005 - Enhanced Event Management routes
+// Note: eventPhotosRouter handles /events/:eventId/photos paths
+app.use('/api', eventPhotosRouter);
+app.use('/api/sessions', sessionsRouter);
+app.use('/api/speeches', speechesRouter);
+app.use('/api', tokensRouter);
 
 // Health check
 app.get('/health', (req, res) => {

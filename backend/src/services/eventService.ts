@@ -29,20 +29,20 @@ export async function createEvent(
   input: EventCreateInput
 ): Promise<Event> {
   // Validate required fields
-  if (!input.event_name || input.event_name.length === 0) {
+  if (!input.name || input.name.length === 0) {
     throw new Error('Event name is required');
   }
 
-  if (input.event_name.length > 255) {
+  if (input.name.length > 255) {
     throw new Error('Event name cannot exceed 255 characters');
   }
 
-  if (!input.event_date) {
+  if (!input.date) {
     throw new Error('Event date is required');
   }
 
-  // Validate event_date is in the future
-  const eventDate = new Date(input.event_date);
+  // Validate date is in the future
+  const eventDate = new Date(input.date);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
@@ -61,17 +61,22 @@ export async function createEvent(
   }
 
   // Compute status
-  const status: 'active' | 'past' = eventDate >= today ? 'active' : 'past';
+  const status: 'draft' | 'upcoming' | 'ongoing' | 'past' = eventDate >= today ? 'upcoming' : 'past';
+
+  // Generate slug from name
+  const slug = input.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 
   // Insert event
-  const { data, error } = await supabase
+  const { data, error} = await supabase
     .from('events')
     .insert({
       tenant_id: tenantId,
-      event_name: input.event_name,
-      event_date: input.event_date,
+      name: input.name,
+      slug: slug,
+      date: input.date,
       description: input.description || null,
       visibility: input.visibility,
+      status: status,
       created_by: adminId
     })
     .select('*')
@@ -81,11 +86,7 @@ export async function createEvent(
     throw new Error(`Failed to create event: ${error.message}`);
   }
 
-  // Add computed status field
-  return {
-    ...data,
-    status
-  };
+  return data;
 }
 
 /**
@@ -114,7 +115,7 @@ export async function updateEvent(
   }
 
   // Check if event is in the past (read-only)
-  const currentEventDate = new Date(currentEvent.event_date);
+  const currentEventDate = new Date(currentEvent.date);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
@@ -122,19 +123,19 @@ export async function updateEvent(
     throw new Error('Cannot edit past events');
   }
 
-  // Validate event_name if provided
-  if (input.event_name !== undefined) {
-    if (input.event_name.length === 0) {
+  // Validate name if provided
+  if (input.name !== undefined) {
+    if (input.name.length === 0) {
       throw new Error('Event name cannot be empty');
     }
-    if (input.event_name.length > 255) {
+    if (input.name.length > 255) {
       throw new Error('Event name cannot exceed 255 characters');
     }
   }
 
-  // Validate event_date if provided
-  if (input.event_date !== undefined) {
-    const newEventDate = new Date(input.event_date);
+  // Validate date if provided
+  if (input.date !== undefined) {
+    const newEventDate = new Date(input.date);
     if (newEventDate < today) {
       throw new Error('Event date must be today or in the future');
     }
@@ -152,8 +153,12 @@ export async function updateEvent(
 
   // Build update object (only include fields that are provided)
   const updateData: any = {};
-  if (input.event_name !== undefined) updateData.event_name = input.event_name;
-  if (input.event_date !== undefined) updateData.event_date = input.event_date;
+  if (input.name !== undefined) {
+    updateData.name = input.name;
+    // Update slug if name changes
+    updateData.slug = input.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  }
+  if (input.date !== undefined) updateData.date = input.date;
   if (input.description !== undefined) updateData.description = input.description;
   if (input.visibility !== undefined) updateData.visibility = input.visibility;
 
@@ -170,14 +175,7 @@ export async function updateEvent(
     throw new Error(`Failed to update event: ${error.message}`);
   }
 
-  // Compute status
-  const eventDate = new Date(data.event_date);
-  const status: 'active' | 'past' = eventDate >= today ? 'active' : 'past';
-
-  return {
-    ...data,
-    status
-  };
+  return data;
 }
 
 /**
@@ -212,16 +210,16 @@ export async function listEvents(
   // Apply filter
   const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
   if (filter === 'active') {
-    query = query.gte('event_date', today);
+    query = query.gte('date', today);
   } else if (filter === 'past') {
-    query = query.lt('event_date', today);
+    query = query.lt('date', today);
   }
 
   // Apply sort
   if (sort === 'date-asc') {
-    query = query.order('event_date', { ascending: true });
+    query = query.order('date', { ascending: true });
   } else if (sort === 'date-desc') {
-    query = query.order('event_date', { ascending: false });
+    query = query.order('date', { ascending: false });
   } else if (sort === 'created-desc') {
     query = query.order('created_at', { ascending: false });
   }
@@ -238,7 +236,7 @@ export async function listEvents(
   todayDate.setHours(0, 0, 0, 0);
 
   const events: Event[] = (data || []).map((event: any) => {
-    const eventDate = new Date(event.event_date);
+    const eventDate = new Date(event.date);
     const status: 'active' | 'past' = eventDate >= todayDate ? 'active' : 'past';
 
     return {
@@ -273,7 +271,7 @@ export async function getEvent(eventId: string, tenantId: string): Promise<Event
   }
 
   // Compute status
-  const eventDate = new Date(data.event_date);
+  const eventDate = new Date(data.date);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const status: 'active' | 'past' = eventDate >= today ? 'active' : 'past';

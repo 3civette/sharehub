@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter } from 'next/navigation';
 import MetricCard from '@/components/dashboard/MetricCard';
-import ActivityLog from '@/components/dashboard/ActivityLog';
+import UpcomingEvents from '@/components/dashboard/UpcomingEvents';
 import QuickActions from '@/components/dashboard/QuickActions';
 
 interface DashboardMetrics {
@@ -12,12 +12,13 @@ interface DashboardMetrics {
   last_activity_at: string | null;
 }
 
-interface Activity {
+interface Event {
   id: string;
-  actor_type: 'admin' | 'organizer' | 'participant' | 'system';
-  action_type: string;
-  metadata: Record<string, any>;
-  created_at: string;
+  name: string;
+  date: string;
+  status: 'draft' | 'upcoming' | 'ongoing' | 'past';
+  visibility: 'public' | 'private';
+  slug: string;
 }
 
 export default function DashboardPage() {
@@ -26,7 +27,7 @@ export default function DashboardPage() {
 
   const [tenantId, setTenantId] = useState<string | null>(null);
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
-  const [activities, setActivities] = useState<Activity[]>([]);
+  const [upcomingEvents, setUpcomingEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -64,13 +65,21 @@ export default function DashboardPage() {
         const metricsData = await metricsResponse.json();
         setMetrics(metricsData);
 
-        // Fetch recent activities
-        const activitiesResponse = await fetch(`http://localhost:3001/dashboard/activity/${adminData.tenant_id}?limit=5`);
-        if (!activitiesResponse.ok) {
-          throw new Error('Errore nel caricamento delle attività');
+        // Fetch upcoming events (status: upcoming, sorted by date)
+        const { data: eventsData, error: eventsError } = await supabase
+          .from('events')
+          .select('id, name, date, status, visibility, slug')
+          .eq('tenant_id', adminData.tenant_id)
+          .in('status', ['upcoming', 'ongoing'])
+          .gte('date', new Date().toISOString().split('T')[0])
+          .order('date', { ascending: true })
+          .limit(5);
+
+        if (eventsError) {
+          console.error('Error loading upcoming events:', eventsError);
+        } else {
+          setUpcomingEvents(eventsData || []);
         }
-        const activitiesData = await activitiesResponse.json();
-        setActivities(activitiesData.activities || []);
 
         setLoading(false);
       } catch (err: any) {
@@ -189,8 +198,8 @@ export default function DashboardPage() {
           <QuickActions />
         </div>
 
-        {/* Recent Activity */}
-        <ActivityLog activities={activities} />
+        {/* Upcoming Events */}
+        <UpcomingEvents events={upcomingEvents} />
       </main>
     </div>
   );

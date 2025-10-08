@@ -1,12 +1,12 @@
 /**
  * Speech Service
  * Purpose: Business logic for speech management within sessions
- * Feature: 003-ora-facciamo-il
+ * Feature: 003-ora-facciamo-il (enhanced by 005-ora-bisogna-implementare)
  */
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import type { Speech, CreateSpeechInput, UpdateSpeechInput } from '../models/speech';
-import { getNextDisplayOrder } from '../models/speech';
+import type { Speech, SpeechWithSlides, CreateSpeechInput, UpdateSpeechInput } from '../models/speech';
+import { getNextDisplayOrder, sortSpeechesSmart } from '../models/speech';
 
 // Initialize Supabase client
 const supabaseUrl = process.env.SUPABASE_URL!;
@@ -32,6 +32,7 @@ export class SpeechService {
 
   /**
    * Create a new speech
+   * Feature 005: Supports scheduled_time, duration_minutes, nullable display_order
    * @param tenantId - Tenant UUID
    * @param input - Speech creation data
    * @returns Created speech
@@ -39,9 +40,12 @@ export class SpeechService {
   async createSpeech(tenantId: string, input: CreateSpeechInput): Promise<Speech> {
     await this.setTenantContext(tenantId);
 
-    // If display_order not provided, get next available
+    // Feature 005: display_order is nullable for chronological auto-ordering
+    // If not provided, keep as null (will be ordered by scheduled_time)
     let displayOrder = input.display_order;
-    if (displayOrder === undefined || displayOrder === null) {
+
+    // Legacy behavior: if explicitly requesting next order, calculate it
+    if (displayOrder === undefined && !input.scheduled_time) {
       const existing = await this.listSpeeches(input.session_id, tenantId);
       displayOrder = getNextDisplayOrder(existing);
     }
@@ -53,9 +57,11 @@ export class SpeechService {
         tenant_id: tenantId,
         title: input.title,
         speaker_name: input.speaker_name,
-        duration: input.duration,
+        duration: input.duration, // Feature 003 legacy
+        duration_minutes: input.duration_minutes, // Feature 005 preferred
         description: input.description,
-        display_order: displayOrder,
+        scheduled_time: input.scheduled_time, // Feature 005
+        display_order: displayOrder ?? null, // Feature 005: nullable
       })
       .select()
       .single();
@@ -69,6 +75,7 @@ export class SpeechService {
 
   /**
    * Update speech
+   * Feature 005: Auto-clears display_order if scheduled_time changes (trigger handles this)
    * @param speechId - Speech UUID
    * @param tenantId - Tenant UUID
    * @param input - Update data
@@ -81,6 +88,7 @@ export class SpeechService {
   ): Promise<Speech> {
     await this.setTenantContext(tenantId);
 
+    // Feature 005: If scheduled_time is being updated, database trigger will auto-clear display_order
     const { data, error } = await this.supabase
       .from('speeches')
       .update(input)
@@ -96,7 +104,8 @@ export class SpeechService {
   }
 
   /**
-   * Delete speech (cascades to slides)
+   * Delete speech
+   * Feature 005: Returns slide count with confirmation message (cascade deletion still active)
    * @param speechId - Speech UUID
    * @param tenantId - Tenant UUID
    * @returns Slide count and success boolean
@@ -104,10 +113,10 @@ export class SpeechService {
   async deleteSpeech(
     speechId: string,
     tenantId: string
-  ): Promise<{ slideCount: number; success: boolean }> {
+  ): Promise<{ deleted: boolean; slide_count: number }> {
     await this.setTenantContext(tenantId);
 
-    // Get slide count before deletion
+    // Feature 005: Get slide count before deletion (for confirmation message)
     const { data: slides } = await this.supabase
       .from('slides')
       .select('id')
@@ -115,20 +124,22 @@ export class SpeechService {
 
     const slideCount = slides?.length || 0;
 
+    // Delete speech (slides cascade automatically via ON DELETE CASCADE)
     const { error } = await this.supabase.from('speeches').delete().eq('id', speechId);
 
     if (error) {
       throw new Error(`Failed to delete speech: ${error.message}`);
     }
 
-    return { slideCount, success: true };
+    return { deleted: true, slide_count: slideCount };
   }
 
   /**
    * List speeches for a session
+   * Feature 005: Smart ordering using sortSpeechesSmart helper
    * @param sessionId - Session UUID
    * @param tenantId - Tenant UUID
-   * @returns Array of speeches ordered by display_order
+   * @returns Array of speeches ordered by smart logic (manual display_order or scheduled_time)
    */
   async listSpeeches(sessionId: string, tenantId: string): Promise<Speech[]> {
     await this.setTenantContext(tenantId);
@@ -136,14 +147,14 @@ export class SpeechService {
     const { data, error } = await this.supabase
       .from('speeches')
       .select('*')
-      .eq('session_id', sessionId)
-      .order('display_order', { ascending: true });
+      .eq('session_id', sessionId);
 
     if (error) {
       throw new Error(`Failed to list speeches: ${error.message}`);
     }
 
-    return (data || []) as Speech[];
+    // Feature 005: Use smart ordering logic from model helper
+    return sortSpeechesSmart((data || []) as Speech[]);
   }
 
   /**
@@ -198,12 +209,13 @@ export class SpeechService {
   }
 
   /**
-   * Get speech with slides
+   * Get speech with slides (hierarchical query)
+   * Feature 005: Uses SpeechWithSlides type
    * @param speechId - Speech UUID
    * @param tenantId - Tenant UUID
-   * @returns Speech with nested slides
+   * @returns Speech with nested slides and count
    */
-  async getSpeechWithSlides(speechId: string, tenantId: string): Promise<any> {
+  async getSpeechWithSlides(speechId: string, tenantId: string): Promise<SpeechWithSlides> {
     await this.setTenantContext(tenantId);
 
     const { data: speech, error: speechError } = await this.supabase
@@ -216,7 +228,7 @@ export class SpeechService {
       throw new Error('Speech not found');
     }
 
-    // Get slides
+    // Get slides ordered by display_order
     const { data: slides, error: slidesError } = await this.supabase
       .from('slides')
       .select('*')
@@ -230,7 +242,8 @@ export class SpeechService {
     return {
       ...speech,
       slides: slides || [],
-    };
+      slide_count: slides?.length || 0
+    } as SpeechWithSlides;
   }
 }
 

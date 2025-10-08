@@ -5,15 +5,19 @@ import { useRouter, useParams } from 'next/navigation';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import EventForm from '@/components/admin/EventForm';
 import AdminHeader from '@/components/admin/AdminHeader';
+import EventPhotoManager from '@/components/admin/EventPhotoManager';
+import SessionManager from '@/components/admin/SessionManager';
+import TokenQRCode from '@/components/admin/TokenQRCode';
 
 interface Event {
   id: string;
   tenant_id: string;
-  event_name: string;
-  event_date: string;
+  name: string;
+  date: string;
+  slug: string;
   description: string | null;
   visibility: 'public' | 'private';
-  status: 'active' | 'past';
+  status: 'draft' | 'upcoming' | 'ongoing' | 'past';
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -31,6 +35,8 @@ export default function EditEventPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [activeTab, setActiveTab] = useState<'details' | 'photos' | 'sessions' | 'tokens'>('details');
+  const [authToken, setAuthToken] = useState<string | null>(null);
 
   useEffect(() => {
     fetchEvent();
@@ -58,7 +64,7 @@ export default function EditEventPage() {
 
       // Fetch event from API
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-      const response = await fetch(`${API_URL}/events/${eventId}`, {
+      const response = await fetch(`${API_URL}/admin/events/${eventId}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -73,6 +79,7 @@ export default function EditEventPage() {
 
       const eventData = await response.json();
       setEvent(eventData);
+      setAuthToken(token);
     } catch (err: any) {
       console.error('Error fetching event:', err);
       setError(err.message || 'Errore nel caricamento dell\'evento');
@@ -97,7 +104,7 @@ export default function EditEventPage() {
 
       // Update event via API
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-      const response = await fetch(`${API_URL}/events/${eventId}`, {
+      const response = await fetch(`${API_URL}/admin/events/${eventId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -111,12 +118,14 @@ export default function EditEventPage() {
         throw new Error(errorData.error || 'Failed to update event');
       }
 
+      const updatedEvent = await response.json();
+      setEvent(updatedEvent);
       setSuccess(true);
 
-      // Redirect after a short delay
+      // Auto-hide success message after 3 seconds
       setTimeout(() => {
-        router.push('/admin/events');
-      }, 1500);
+        setSuccess(false);
+      }, 3000);
     } catch (err: any) {
       console.error('Error updating event:', err);
       setError(err.message || 'Failed to update event');
@@ -211,8 +220,87 @@ export default function EditEventPage() {
         }
       />
 
-      <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-white rounded-lg shadow-md p-6">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Action Bar - Shows for all tabs */}
+        {!isReadOnly && (
+          <div className="bg-white rounded-t-lg shadow-md px-6 py-4 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-medium text-gray-700">
+                  {activeTab === 'details' && 'Modifica Dettagli Evento'}
+                  {activeTab === 'photos' && 'Gestisci Foto Evento'}
+                  {activeTab === 'sessions' && 'Gestisci Sessioni e Interventi'}
+                  {activeTab === 'tokens' && 'Gestisci Token di Accesso'}
+                </h3>
+                <p className="text-xs text-gray-500 mt-1">
+                  {activeTab === 'details' && 'Modifica i dettagli principali dell\'evento'}
+                  {activeTab === 'photos' && 'Carica, ordina e gestisci le foto dell\'evento'}
+                  {activeTab === 'sessions' && 'Crea e organizza sessioni e interventi'}
+                  {activeTab === 'tokens' && 'Genera token di accesso per eventi privati'}
+                </p>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => router.push('/admin/events')}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  ← Torna alla Lista
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Tabs Navigation */}
+        <div className={`bg-white ${isReadOnly ? 'rounded-t-lg' : ''} shadow-md border-b border-gray-200`}>
+          <nav className="flex space-x-8 px-6" aria-label="Tabs">
+            <button
+              onClick={() => setActiveTab('details')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                activeTab === 'details'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Event Details
+            </button>
+            <button
+              onClick={() => setActiveTab('photos')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                activeTab === 'photos'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Photos
+            </button>
+            <button
+              onClick={() => setActiveTab('sessions')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                activeTab === 'sessions'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Sessions & Speeches
+            </button>
+            {event.visibility === 'private' && (
+              <button
+                onClick={() => setActiveTab('tokens')}
+                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                  activeTab === 'tokens'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                Access Tokens
+              </button>
+            )}
+          </nav>
+        </div>
+
+        {/* Tab Content */}
+        <div className="bg-white rounded-b-lg shadow-md p-6">
           {success && (
             <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-md">
               <div className="flex gap-3">
@@ -232,7 +320,7 @@ export default function EditEventPage() {
                 <div>
                   <h3 className="text-sm font-medium text-green-900">Successo</h3>
                   <p className="text-sm text-green-800 mt-1">
-                    L'evento è stato aggiornato con successo. Reindirizzamento...
+                    Le modifiche sono state salvate con successo.
                   </p>
                 </div>
               </div>
@@ -263,12 +351,56 @@ export default function EditEventPage() {
             </div>
           )}
 
-          <EventForm
-            mode="edit"
-            initialData={event}
-            onSubmit={handleSubmit}
-            isReadOnly={isReadOnly}
-          />
+          {/* Details Tab */}
+          {activeTab === 'details' && (
+            <EventForm
+              mode="edit"
+              initialData={event}
+              onSubmit={handleSubmit}
+              isReadOnly={isReadOnly}
+            />
+          )}
+
+          {/* Photos Tab */}
+          {activeTab === 'photos' && authToken && (
+            <EventPhotoManager
+              eventId={eventId}
+              token={authToken}
+              onUpdate={() => {
+                // Optionally refresh event data
+                fetchEvent();
+              }}
+            />
+          )}
+
+          {/* Sessions & Speeches Tab */}
+          {activeTab === 'sessions' && authToken && (
+            <SessionManager
+              eventId={eventId}
+              token={authToken}
+              onUpdate={() => {
+                // Optionally refresh event data
+                fetchEvent();
+              }}
+            />
+          )}
+
+          {/* Tokens Tab */}
+          {activeTab === 'tokens' && authToken && event.visibility === 'private' && (
+            <div className="space-y-6">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h3 className="text-sm font-medium text-blue-900 mb-2">
+                  Access Tokens for Private Event
+                </h3>
+                <p className="text-sm text-blue-800">
+                  Generate and manage access tokens for this private event.
+                  Tokens allow attendees to view the event without public access.
+                </p>
+              </div>
+              {/* Token management UI would go here */}
+              <p className="text-gray-500 italic">Token management interface coming soon...</p>
+            </div>
+          )}
         </div>
       </main>
     </div>

@@ -35,6 +35,11 @@ export interface AccessToken {
   created_at: string; // ISO timestamp
   last_used_at?: string; // ISO timestamp
   use_count: number;
+
+  // Feature 005: QR Code and revocation
+  qr_code_data_url?: string; // PNG data URL
+  revoked_at?: string; // ISO timestamp
+  revoked_by?: string; // Admin UUID
 }
 
 // =============================================================================

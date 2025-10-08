@@ -9,6 +9,8 @@ Auto-generated from all feature plans. Last updated: 2025-10-06
 - TypeScript 5.3+ (Node.js 20 LTS backend, React 18 frontend) + Express.js (backend), Next.js 14 App Router (frontend), Supabase (database + auth + storage), Tailwind CSS (styling) (003-ora-facciamo-il)
 - Supabase PostgreSQL with RLS policies, Supabase Storage for slide files (003-ora-facciamo-il)
 - TypeScript 5.3+ (Node.js 20 LTS backend, React 18 frontend) + Express.js (backend API), Next.js 14 App Router (frontend), Supabase (database + auth + storage), Tailwind CSS (styling), archiver (ZIP generation) (004-facciamo-la-pagina)
+- TypeScript 5.3+ (Node.js 20 LTS backend, React 18 frontend) + Express.js (backend), Next.js 14 App Router (frontend), Supabase (database + auth + storage), Tailwind CSS (styling), Multer (file uploads), QRCode library (token QR generation) (005-ora-bisogna-implementare)
+- Supabase PostgreSQL with RLS policies + Supabase Storage for files (event photos, slides) (005-ora-bisogna-implementare)
 
 ## Project Structure
 ```
@@ -24,9 +26,9 @@ npm test; npm run lint
 TypeScript 5.3+ (Node.js 20 LTS for backend, React 18 for frontend): Follow standard conventions
 
 ## Recent Changes
+- 005-ora-bisogna-implementare: Added TypeScript 5.3+ (Node.js 20 LTS backend, React 18 frontend) + Express.js (backend), Next.js 14 App Router (frontend), Supabase (database + auth + storage), Tailwind CSS (styling), Multer (file uploads), QRCode library (token QR generation)
 - 004-facciamo-la-pagina: Added TypeScript 5.3+ (Node.js 20 LTS backend, React 18 frontend) + Express.js (backend API), Next.js 14 App Router (frontend), Supabase (database + auth + storage), Tailwind CSS (styling), archiver (ZIP generation)
 - 003-ora-facciamo-il: Added TypeScript 5.3+ (Node.js 20 LTS backend, React 18 frontend) + Express.js (backend), Next.js 14 App Router (frontend), Supabase (database + auth + storage), Tailwind CSS (styling)
-- 002-facciamo-tutti-gli: Added TypeScript 5.3+ (Node.js 20 LTS backend, React 18 frontend)
 
 <!-- MANUAL ADDITIONS START -->
 
@@ -391,5 +393,37 @@ npm run lint             # Lint code
 - Check URL params are updating (`useSearchParams`)
 - Verify `useEffect` dependency includes `searchParams`
 - Ensure backend supports query params
+
+## Drag and Drop File Upload Pattern
+
+### Reusable FileDropzone Component
+**Pattern**: Drag-and-drop file upload with validation
+**Location**: `frontend/src/components/common/FileDropzone.tsx`
+
+```typescript
+<FileDropzone
+  onFilesSelected={(files) => handleUpload(files)}
+  accept="image/jpeg,image/png"
+  multiple={true}
+  maxSize={50 * 1024 * 1024}
+  disabled={uploading}
+/>
+```
+
+**Features**:
+- Drag and drop + click to upload
+- Client-side validation (file type, size)
+- Visual feedback on drag over
+- Error messages with auto-hide
+- Support for single/multiple files
+- Customizable accept types
+- File size validation with human-readable messages
+
+**Usage in components**:
+- `EventPhotoManager` - Photo uploads (JPEG/PNG/WebP, 50MB)
+- `SlideUpload` - Presentation files (PDF/PPT/PPTX, 100MB)
+- `LogoUpload` - Branding logos (JPEG/PNG/SVG, 2MB)
+
+**Benefits**: Consistent UX, reusable validation, better accessibility
 
 <!-- MANUAL ADDITIONS END -->
