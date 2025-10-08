@@ -57,9 +57,7 @@ export const createSessionSchema = z.object({
     .number()
     .int()
     .nonnegative('Display order must be non-negative')
-    .optional()
-    .nullable() // Feature 005: nullable for auto-ordering
-    .default(null),
+    .optional(),
 });
 
 export type CreateSessionInput = z.infer<typeof createSessionSchema>;

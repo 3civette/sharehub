@@ -18,6 +18,8 @@ interface Event {
   created_by: string;
   created_at: string;
   updated_at: string;
+  sessions_count?: number;
+  speeches_count?: number;
 }
 
 export default function AdminEventsPage() {
@@ -87,7 +89,40 @@ export default function AdminEventsPage() {
         throw error;
       }
 
-      setEvents(data || []);
+      // Fetch counts for each event
+      const eventsWithCounts = await Promise.all(
+        (data || []).map(async (event) => {
+          // Get sessions count
+          const { count: sessionsCount } = await supabase
+            .from('sessions')
+            .select('*', { count: 'exact', head: true })
+            .eq('event_id', event.id);
+
+          // Get speeches count
+          const { data: sessions } = await supabase
+            .from('sessions')
+            .select('id')
+            .eq('event_id', event.id);
+
+          const sessionIds = (sessions || []).map(s => s.id);
+          let speechesCount = 0;
+          if (sessionIds.length > 0) {
+            const { count } = await supabase
+              .from('speeches')
+              .select('*', { count: 'exact', head: true })
+              .in('session_id', sessionIds);
+            speechesCount = count || 0;
+          }
+
+          return {
+            ...event,
+            sessions_count: sessionsCount || 0,
+            speeches_count: speechesCount,
+          };
+        })
+      );
+
+      setEvents(eventsWithCounts);
     } catch (err: any) {
       console.error('Error fetching events:', err);
       setError(err.message || 'Failed to load events');

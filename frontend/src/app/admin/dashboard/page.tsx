@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import MetricCard from '@/components/dashboard/MetricCard';
 import UpcomingEvents from '@/components/dashboard/UpcomingEvents';
 import QuickActions from '@/components/dashboard/QuickActions';
+import UpcomingEvents from '@/components/dashboard/UpcomingEvents';
 
 interface DashboardMetrics {
   active_events_count: number;
@@ -199,7 +200,12 @@ export default function DashboardPage() {
         </div>
 
         {/* Upcoming Events */}
-        <UpcomingEvents events={upcomingEvents} />
+        <div className="mb-8">
+          <UpcomingEvents />
+        </div>
+
+        {/* Recent Activity */}
+        <ActivityLog activities={activities} />
       </main>
     </div>
   );

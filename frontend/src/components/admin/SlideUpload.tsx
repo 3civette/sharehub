@@ -1,191 +1,329 @@
 'use client';
 
-// SlideUpload Component
-// Feature: 005-ora-bisogna-implementare (Event Details Management)
-// Uploads slides for a specific speech with format validation and metadata display
+// Feature 005: Slide Upload Component
+// Upload and manage slides for a speech
 
-import React, { useState, useRef } from 'react';
+import { useState, useEffect } from 'react';
 
-interface SlideUploadProps {
-  speechId: string;
-  speechTitle: string;
-  speakerName: string;
-  token: string;
-  allowedFormats?: string[]; // From event.allowed_slide_formats
-  onUploadComplete?: () => void;
+interface Slide {
+  id: string;
+  filename: string;
+  file_size: number;
+  mime_type: string;
+  display_order: number;
+  uploaded_at: string;
+  uploaded_by: string;
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+interface SlideUploadProps {
+  eventId: string;
+  speechId: string;
+  accessToken: string;
+}
 
-export default function SlideUpload({
-  speechId,
-  speechTitle,
-  speakerName,
-  token,
-  allowedFormats = ['application/pdf', 'application/vnd.ms-powerpoint', 'application/vnd.openxmlformats-officedocument.presentationml.presentation'],
-  onUploadComplete,
-}: SlideUploadProps) {
+export default function SlideUpload({ eventId, speechId, accessToken }: SlideUploadProps) {
+  const [slides, setSlides] = useState<Slide[]>([]);
   const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [loading, setLoading] = useState(true);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
-  const formatLabels: Record<string, string> = {
-    'application/pdf': 'PDF',
-    'application/vnd.ms-powerpoint': 'PPT',
-    'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'PPTX',
-  };
+  // Fetch existing slides
+  useEffect(() => {
+    fetchSlides();
+  }, []);
 
-  const getFormatLabel = (mimeType: string): string => {
-    return formatLabels[mimeType] || mimeType;
+  const fetchSlides = async () => {
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/speeches/${speechId}/slides`,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        setSlides(data);
+      }
+    } catch (error) {
+      console.error('Fetch slides error:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const validateFile = (file: File): string | null => {
-    // Check if format is allowed
-    if (!allowedFormats.includes(file.type)) {
-      const allowedNames = allowedFormats.map(getFormatLabel).join(', ');
-      return `Invalid file type. Allowed formats: ${allowedNames}`;
+    // Validate file type
+    const allowedTypes = [
+      'application/pdf',
+      'application/vnd.ms-powerpoint',
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      'application/vnd.oasis.opendocument.presentation',
+      'application/x-iwork-keynote-sffkey',
+    ];
+
+    if (!allowedTypes.includes(file.type) && !file.name.endsWith('.key')) {
+      return 'Tipo di file non valido. Usa PDF, PPT, PPTX, KEY o ODP.';
     }
 
-    // Check file size (100MB max)
-    const maxSize = 100 * 1024 * 1024;
-    if (file.size > maxSize) {
-      return 'File size exceeds 100MB limit';
+    // Validate file size (100MB max)
+    if (file.size > 100 * 1024 * 1024) {
+      return 'File troppo grande. Dimensione massima: 100MB';
     }
 
     return null;
   };
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file
-    const validationError = validateFile(file);
-    if (validationError) {
-      setError(validationError);
-      setSuccess(null);
+    const error = validateFile(file);
+    if (error) {
+      alert(error);
       return;
     }
 
+    setSelectedFile(file);
+  };
+
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+
+    const error = validateFile(file);
+    if (error) {
+      alert(error);
+      return;
+    }
+
+    setSelectedFile(file);
+  };
+
+  const handleUpload = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedFile) return;
+
+    setUploading(true);
+
     try {
-      setUploading(true);
-      setError(null);
-      setSuccess(null);
-
-      // Create form data
       const formData = new FormData();
-      formData.append('slide', file);
+      formData.append('file', selectedFile);
+      formData.append('display_order', String(slides.length));
 
-      // Upload to API
-      const response = await fetch(`${API_BASE_URL}/api/speeches/${speechId}/slides`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-        body: formData,
-      });
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/speeches/${speechId}/slides`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: formData,
+        }
+      );
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({
-          error: 'Upload failed',
-          message: response.statusText,
-        }));
-        throw new Error(errorData.message || errorData.error || 'Failed to upload slide');
+        const error = await response.json();
+        throw new Error(error.message || 'Upload failed');
       }
 
-      const result = await response.json();
-      setSuccess(`Slide "${file.name}" uploaded successfully`);
-      onUploadComplete?.();
+      const newSlide = await response.json();
+      setSlides([...slides, newSlide]);
+      setSelectedFile(null);
 
       // Reset file input
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to upload slide');
+      const fileInput = document.getElementById('file-input') as HTMLInputElement;
+      if (fileInput) fileInput.value = '';
+
+      alert('Slide caricata con successo!');
+    } catch (error) {
+      console.error('Upload error:', error);
+      alert(`Errore nell'upload: ${error instanceof Error ? error.message : 'Errore sconosciuto'}`);
     } finally {
       setUploading(false);
     }
   };
 
-  const handleButtonClick = () => {
-    fileInputRef.current?.click();
+  const handleDelete = async (slideId: string) => {
+    if (!confirm('Sei sicuro di voler eliminare questa slide?')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/slides/${slideId}`,
+        {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Delete failed');
+      }
+
+      setSlides(slides.filter((s) => s.id !== slideId));
+      alert('Slide eliminata con successo!');
+    } catch (error) {
+      console.error('Delete error:', error);
+      alert('Errore nell\'eliminazione della slide');
+    }
   };
 
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  const getFileIcon = (mimeType: string): string => {
+    if (mimeType.includes('pdf')) return '📄';
+    if (mimeType.includes('powerpoint') || mimeType.includes('presentation')) return '📊';
+    return '📁';
+  };
+
+  if (loading) {
+    return (
+      <div className="bg-white shadow rounded-lg p-6">
+        <p className="text-gray-500 text-center">Caricamento...</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-4">
-      {/* Speech context */}
-      <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
-        <h4 className="text-sm font-medium text-gray-900">Uploading slide for:</h4>
-        <p className="text-lg font-semibold text-gray-900 mt-1">{speechTitle}</p>
-        <p className="text-sm text-gray-600 mt-1">Speaker: {speakerName}</p>
-      </div>
+    <div className="space-y-6">
+      {/* Upload Form */}
+      <div className="bg-white shadow rounded-lg p-6">
+        <h2 className="text-xl font-bold text-gray-900 mb-4">Carica Nuova Slide</h2>
 
-      {/* Upload section */}
-      <div className="space-y-2">
-        <label className="block text-sm font-medium text-gray-700">
-          Upload Slide
-        </label>
-        <p className="text-xs text-gray-500">
-          Allowed formats: {allowedFormats.map(getFormatLabel).join(', ')} (max 100MB)
-        </p>
-
-        {/* Hidden file input */}
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept={allowedFormats.join(',')}
-          onChange={handleFileSelect}
-          disabled={uploading}
-          className="hidden"
-        />
-
-        {/* Upload button */}
-        <button
-          onClick={handleButtonClick}
-          disabled={uploading}
-          className="w-full px-4 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 transition-colors"
-        >
-          {uploading ? (
-            <span className="flex items-center justify-center gap-2">
-              <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                  fill="none"
+        <form onSubmit={handleUpload} className="space-y-4">
+          {/* Drag & Drop Zone */}
+          <div
+            onDragEnter={handleDragEnter}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            className={`border-2 border-dashed rounded-lg p-8 text-center transition ${
+              isDragging
+                ? 'border-purple-500 bg-purple-50'
+                : 'border-gray-300 bg-gray-50 hover:border-purple-400'
+            }`}
+          >
+            <div className="space-y-2">
+              <div className="text-4xl">📄</div>
+              <p className="text-lg font-medium text-gray-900">
+                {isDragging ? 'Rilascia il file qui' : 'Trascina il file qui'}
+              </p>
+              <p className="text-sm text-gray-600">oppure</p>
+              <label className="inline-block cursor-pointer">
+                <span className="px-4 py-2 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700 transition">
+                  Scegli File
+                </span>
+                <input
+                  id="file-input"
+                  type="file"
+                  accept=".pdf,.ppt,.pptx,.key,.odp"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                  disabled={uploading}
                 />
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                />
-              </svg>
-              Uploading...
-            </span>
-          ) : (
-            'Choose File to Upload'
+              </label>
+              <p className="text-xs text-gray-500 mt-2">
+                Formati supportati: PDF, PPT, PPTX, KEY, ODP (max 100MB)
+              </p>
+            </div>
+          </div>
+
+          {selectedFile && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <p className="text-sm font-medium text-gray-900">File selezionato:</p>
+              <p className="text-sm text-gray-600">
+                {selectedFile.name} ({formatFileSize(selectedFile.size)})
+              </p>
+            </div>
           )}
-        </button>
+
+          <button
+            type="submit"
+            disabled={!selectedFile || uploading}
+            className="px-4 py-2 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700 transition disabled:bg-gray-300 disabled:cursor-not-allowed"
+          >
+            {uploading ? 'Caricamento...' : 'Carica Slide'}
+          </button>
+        </form>
       </div>
 
-      {/* Error message */}
-      {error && (
-        <div className="p-4 bg-red-50 border border-red-200 rounded-md">
-          <p className="text-sm text-red-800">{error}</p>
-        </div>
-      )}
+      {/* Slides List */}
+      <div className="bg-white shadow rounded-lg p-6">
+        <h2 className="text-xl font-bold text-gray-900 mb-4">
+          Slide Caricate ({slides.length})
+        </h2>
 
-      {/* Success message */}
-      {success && (
-        <div className="p-4 bg-green-50 border border-green-200 rounded-md">
-          <p className="text-sm text-green-800">{success}</p>
-        </div>
-      )}
+        {slides.length === 0 ? (
+          <p className="text-gray-500 text-center py-8">
+            Nessuna slide caricata. Inizia caricando il primo file.
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {slides.map((slide, index) => (
+              <div
+                key={slide.id}
+                className="border rounded-lg p-4 flex items-center justify-between hover:bg-gray-50 transition"
+              >
+                <div className="flex items-center gap-3 flex-1">
+                  <span className="text-2xl">{getFileIcon(slide.mime_type)}</span>
+                  <div className="flex-1">
+                    <p className="font-medium text-gray-900">
+                      {index + 1}. {slide.filename}
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      {formatFileSize(slide.file_size)} • Caricato il{' '}
+                      {new Date(slide.uploaded_at).toLocaleDateString('it-IT')} alle{' '}
+                      {new Date(slide.uploaded_at).toLocaleTimeString('it-IT', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => handleDelete(slide.id)}
+                  className="ml-4 px-3 py-1.5 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded transition"
+                >
+                  Elimina
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -1,491 +1,371 @@
 'use client';
 
-// SpeechManager Component
-// Feature: 005-ora-bisogna-implementare (Event Details Management)
-// Manages speeches within a session with CRUD operations and smart ordering
+// Feature 005: Speech Manager Component
+// Manage speeches (CRUD operations)
 
-import React, { useState, useEffect } from 'react';
-import {
-  createSpeech,
-  listSpeeches,
-  updateSpeech,
-  deleteSpeech,
-  reorderSpeeches,
-  type Speech,
-  type CreateSpeechInput,
-  type UpdateSpeechInput,
-} from '@/services/speechService';
+import { useState } from 'react';
 
-interface SpeechManagerProps {
-  sessionId: string;
-  sessionTitle: string;
-  token: string;
-  onUpdate?: () => void;
+interface Session {
+  id: string;
+  title: string;
+  start_time: string;
 }
 
-export default function SpeechManager({
-  sessionId,
-  sessionTitle,
-  token,
-  onUpdate,
-}: SpeechManagerProps) {
-  const [speeches, setSpeeches] = useState<Speech[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [editingSpeech, setEditingSpeech] = useState<Speech | null>(null);
-  const [showForm, setShowForm] = useState(false);
-  const [draggedSpeechId, setDraggedSpeechId] = useState<string | null>(null);
-  const [formData, setFormData] = useState<CreateSpeechInput>({
+interface Speech {
+  id: string;
+  session_id: string;
+  title: string;
+  speaker_name: string | null;
+  description: string | null;
+  duration: number | null;
+  display_order: number;
+  session: {
+    id: string;
+    title: string;
+  };
+  created_at: string;
+  updated_at: string;
+}
+
+interface SpeechManagerProps {
+  eventId: string;
+  sessions: Session[];
+  speeches: Speech[];
+  accessToken: string;
+}
+
+export default function SpeechManager({ eventId, sessions, speeches: initialSpeeches, accessToken }: SpeechManagerProps) {
+  const [speeches, setSpeeches] = useState<Speech[]>(initialSpeeches);
+  const [isCreating, setIsCreating] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [formData, setFormData] = useState({
+    session_id: '',
     title: '',
     speaker_name: '',
-    speaker_bio: null,
-    description: null,
-    duration_minutes: null,
-    scheduled_time: null,
-    display_order: null,
+    description: '',
+    duration: '',
   });
 
-  useEffect(() => {
-    loadSpeeches();
-  }, [sessionId]);
-
-  const loadSpeeches = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await listSpeeches(sessionId, token);
-      setSpeeches(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load speeches');
-    } finally {
-      setLoading(false);
-    }
+  const resetForm = () => {
+    setFormData({
+      session_id: '',
+      title: '',
+      speaker_name: '',
+      description: '',
+      duration: '',
+    });
+    setIsCreating(false);
+    setEditingId(null);
   };
 
-  const handleCreateSpeech = async (e: React.FormEvent) => {
+  const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    try {
-      setLoading(true);
-      setError(null);
-      await createSpeech(sessionId, formData, token);
-      await loadSpeeches();
-      setShowForm(false);
-      setFormData({
-        title: '',
-        speaker_name: '',
-        speaker_bio: null,
-        description: null,
-        duration_minutes: null,
-        scheduled_time: null,
-        display_order: null,
-      });
-      onUpdate?.();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create speech');
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  const handleUpdateSpeech = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingSpeech) return;
-
-    try {
-      setLoading(true);
-      setError(null);
-      const updateData: UpdateSpeechInput = {
-        title: formData.title,
-        speaker_name: formData.speaker_name,
-        speaker_bio: formData.speaker_bio,
-        description: formData.description,
-        duration_minutes: formData.duration_minutes,
-        scheduled_time: formData.scheduled_time,
-        display_order: formData.display_order,
-      };
-      await updateSpeech(editingSpeech.id, updateData, token);
-      await loadSpeeches();
-      setEditingSpeech(null);
-      setFormData({
-        title: '',
-        speaker_name: '',
-        speaker_bio: null,
-        description: null,
-        duration_minutes: null,
-        scheduled_time: null,
-        display_order: null,
-      });
-      onUpdate?.();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update speech');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDeleteSpeech = async (speechId: string, speechTitle: string) => {
-    if (!confirm(`Are you sure you want to delete "${speechTitle}"? This will also delete all associated slides.`)) {
+    if (!formData.session_id) {
+      alert('Seleziona una sessione');
       return;
     }
 
     try {
-      setLoading(true);
-      setError(null);
-      const result = await deleteSpeech(speechId, token);
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/events/${eventId}/sessions/${formData.session_id}/speeches`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({
+            title: formData.title,
+            speaker_name: formData.speaker_name || null,
+            description: formData.description || null,
+            duration: formData.duration ? parseInt(formData.duration) : null,
+          }),
+        }
+      );
 
-      // Show confirmation with slide count
-      if (result.slides_deleted > 0) {
-        alert(`Deleted "${speechTitle}" and ${result.slides_deleted} slide(s)`);
+      if (!response.ok) {
+        throw new Error('Failed to create speech');
       }
 
-      await loadSpeeches();
-      onUpdate?.();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete speech');
-    } finally {
-      setLoading(false);
+      const newSpeech = await response.json();
+
+      // Add session info to match the interface
+      const session = sessions.find(s => s.id === formData.session_id);
+      setSpeeches([...speeches, { ...newSpeech, session: { id: session!.id, title: session!.title } }]);
+      resetForm();
+      alert('Intervento creato con successo!');
+    } catch (error) {
+      console.error('Create speech error:', error);
+      alert('Errore nella creazione dell\'intervento');
     }
   };
 
-  const handleEditClick = (speech: Speech) => {
-    setEditingSpeech(speech);
-    setFormData({
-      title: speech.title,
-      speaker_name: speech.speaker_name,
-      speaker_bio: speech.speaker_bio,
-      description: speech.description,
-      duration_minutes: speech.duration_minutes,
-      scheduled_time: speech.scheduled_time,
-      display_order: speech.display_order,
-    });
-    setShowForm(false);
-  };
-
-  const handleCancelEdit = () => {
-    setEditingSpeech(null);
-    setFormData({
-      title: '',
-      speaker_name: '',
-      speaker_bio: null,
-      description: null,
-      duration_minutes: null,
-      scheduled_time: null,
-      display_order: null,
-    });
-  };
-
-  const handleDragStart = (speechId: string) => {
-    setDraggedSpeechId(speechId);
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
+  const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
-  };
 
-  const handleDrop = async (e: React.DragEvent, targetSpeechId: string) => {
-    e.preventDefault();
-    if (!draggedSpeechId || draggedSpeechId === targetSpeechId) return;
+    if (!editingId || !formData.session_id) return;
 
-    const draggedIndex = speeches.findIndex((s) => s.id === draggedSpeechId);
-    const targetIndex = speeches.findIndex((s) => s.id === targetSpeechId);
-
-    if (draggedIndex === -1 || targetIndex === -1) return;
-
-    // Reorder array
-    const newOrder = [...speeches];
-    const [draggedSpeech] = newOrder.splice(draggedIndex, 1);
-    newOrder.splice(targetIndex, 0, draggedSpeech);
-
-    // Update display immediately
-    setSpeeches(newOrder);
-
-    // Save to backend
     try {
-      setError(null);
-      await reorderSpeeches(
-        sessionId,
-        newOrder.map((s) => s.id),
-        token
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/events/${eventId}/sessions/${formData.session_id}/speeches/${editingId}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({
+            title: formData.title,
+            speaker_name: formData.speaker_name || null,
+            description: formData.description || null,
+            duration: formData.duration ? parseInt(formData.duration) : null,
+          }),
+        }
       );
-      await loadSpeeches();
-      onUpdate?.();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to reorder speeches');
-      await loadSpeeches(); // Reload on error
-    } finally {
-      setDraggedSpeechId(null);
+
+      if (!response.ok) {
+        throw new Error('Failed to update speech');
+      }
+
+      const updatedSpeech = await response.json();
+      const session = sessions.find(s => s.id === formData.session_id);
+      setSpeeches(speeches.map((s) => (s.id === editingId ? { ...updatedSpeech, session: { id: session!.id, title: session!.title } } : s)));
+      resetForm();
+      alert('Intervento aggiornato con successo!');
+    } catch (error) {
+      console.error('Update speech error:', error);
+      alert('Errore nell\'aggiornamento dell\'intervento');
     }
+  };
+
+  const handleDelete = async (speech: Speech) => {
+    if (!confirm('Sei sicuro di voler eliminare questo intervento? Questa azione non può essere annullata.')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/events/${eventId}/sessions/${speech.session_id}/speeches/${speech.id}`,
+        {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to delete speech');
+      }
+
+      setSpeeches(speeches.filter((s) => s.id !== speech.id));
+      alert('Intervento eliminato con successo!');
+    } catch (error) {
+      console.error('Delete speech error:', error);
+      alert('Errore nell\'eliminazione dell\'intervento');
+    }
+  };
+
+  const startEdit = (speech: Speech) => {
+    setFormData({
+      session_id: speech.session_id,
+      title: speech.title,
+      speaker_name: speech.speaker_name || '',
+      description: speech.description || '',
+      duration: speech.duration?.toString() || '',
+    });
+    setEditingId(speech.id);
+    setIsCreating(false);
   };
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-medium text-gray-900">Speeches</h3>
-          <p className="text-sm text-gray-500">Session: {sessionTitle}</p>
+      {/* Warning if no sessions */}
+      {sessions.length === 0 && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+          <p className="text-yellow-800">
+            ⚠️ Non ci sono sessioni disponibili. <a href={`/admin/events/${eventId}/sessions`} className="underline font-medium">Crea prima una sessione</a> per poter aggiungere interventi.
+          </p>
         </div>
+      )}
+
+      {/* Create Button */}
+      {!isCreating && !editingId && sessions.length > 0 && (
         <button
-          onClick={() => {
-            setShowForm(!showForm);
-            setEditingSpeech(null);
-            setFormData({
-              title: '',
-              speaker_name: '',
-              speaker_bio: null,
-              description: null,
-              duration_minutes: null,
-              scheduled_time: null,
-              display_order: null,
-            });
-          }}
-          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+          onClick={() => setIsCreating(true)}
+          className="px-4 py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition"
         >
-          {showForm ? 'Cancel' : 'Add Speech'}
+          + Crea Nuovo Intervento
         </button>
-      </div>
+      )}
 
-      {error && (
-        <div className="p-4 bg-red-50 border border-red-200 rounded-md">
-          <p className="text-sm text-red-800">{error}</p>
+      {/* Create/Edit Form */}
+      {(isCreating || editingId) && (
+        <div className="bg-white shadow rounded-lg p-6">
+          <h2 className="text-xl font-bold text-gray-900 mb-4">
+            {editingId ? 'Modifica Intervento' : 'Crea Nuovo Intervento'}
+          </h2>
+
+          <form onSubmit={editingId ? handleUpdate : handleCreate} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Sessione <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={formData.session_id}
+                onChange={(e) => setFormData({ ...formData, session_id: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                required
+              >
+                <option value="">Seleziona una sessione</option>
+                {sessions.map((session) => (
+                  <option key={session.id} value={session.id}>
+                    {session.title} - {new Date(session.start_time).toLocaleDateString('it-IT')}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Titolo <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={formData.title}
+                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                required
+                maxLength={150}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Relatore
+              </label>
+              <input
+                type="text"
+                value={formData.speaker_name}
+                onChange={(e) => setFormData({ ...formData, speaker_name: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                maxLength={100}
+                placeholder="Nome del relatore"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Descrizione
+              </label>
+              <textarea
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                rows={3}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Durata (minuti)
+              </label>
+              <input
+                type="number"
+                value={formData.duration}
+                onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                min="1"
+                max="600"
+                placeholder="es. 30"
+              />
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                type="submit"
+                className="px-4 py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition"
+              >
+                {editingId ? 'Salva Modifiche' : 'Crea Intervento'}
+              </button>
+              <button
+                type="button"
+                onClick={resetForm}
+                className="px-4 py-2 bg-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-300 transition"
+              >
+                Annulla
+              </button>
+            </div>
+          </form>
         </div>
       )}
 
-      {/* Create form */}
-      {showForm && (
-        <form onSubmit={handleCreateSpeech} className="p-4 bg-gray-50 rounded-lg space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Title *
-              </label>
-              <input
-                type="text"
-                required
-                value={formData.title}
-                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Speaker Name *
-              </label>
-              <input
-                type="text"
-                required
-                value={formData.speaker_name}
-                onChange={(e) => setFormData({ ...formData, speaker_name: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
-              />
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Speaker Bio
-            </label>
-            <textarea
-              value={formData.speaker_bio || ''}
-              onChange={(e) => setFormData({ ...formData, speaker_bio: e.target.value || null })}
-              rows={2}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Description
-            </label>
-            <textarea
-              value={formData.description || ''}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value || null })}
-              rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Duration (minutes)
-              </label>
-              <input
-                type="number"
-                min="1"
-                value={formData.duration_minutes || ''}
-                onChange={(e) => setFormData({ ...formData, duration_minutes: e.target.value ? parseInt(e.target.value) : null })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Scheduled Time
-              </label>
-              <input
-                type="datetime-local"
-                value={formData.scheduled_time || ''}
-                onChange={(e) => setFormData({ ...formData, scheduled_time: e.target.value || null })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
-              />
-            </div>
-          </div>
-          <button
-            type="submit"
-            disabled={loading}
-            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-gray-400"
-          >
-            {loading ? 'Creating...' : 'Create Speech'}
-          </button>
-        </form>
-      )}
+      {/* Speeches List - Grouped by Session */}
+      <div className="bg-white shadow rounded-lg p-6">
+        <h2 className="text-xl font-bold text-gray-900 mb-4">Interventi ({speeches.length})</h2>
 
-      {/* Edit form */}
-      {editingSpeech && (
-        <form onSubmit={handleUpdateSpeech} className="p-4 bg-blue-50 rounded-lg space-y-4">
-          <h4 className="font-medium text-gray-900">Edit Speech</h4>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Title *
-              </label>
-              <input
-                type="text"
-                required
-                value={formData.title}
-                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Speaker Name *
-              </label>
-              <input
-                type="text"
-                required
-                value={formData.speaker_name}
-                onChange={(e) => setFormData({ ...formData, speaker_name: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
-              />
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Speaker Bio
-            </label>
-            <textarea
-              value={formData.speaker_bio || ''}
-              onChange={(e) => setFormData({ ...formData, speaker_bio: e.target.value || null })}
-              rows={2}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Description
-            </label>
-            <textarea
-              value={formData.description || ''}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value || null })}
-              rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Duration (minutes)
-              </label>
-              <input
-                type="number"
-                min="1"
-                value={formData.duration_minutes || ''}
-                onChange={(e) => setFormData({ ...formData, duration_minutes: e.target.value ? parseInt(e.target.value) : null })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Scheduled Time
-              </label>
-              <input
-                type="datetime-local"
-                value={formData.scheduled_time || ''}
-                onChange={(e) => setFormData({ ...formData, scheduled_time: e.target.value || null })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
-              />
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <button
-              type="submit"
-              disabled={loading}
-              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-gray-400"
-            >
-              {loading ? 'Saving...' : 'Save Changes'}
-            </button>
-            <button
-              type="button"
-              onClick={handleCancelEdit}
-              className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400"
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
-      )}
+        {speeches.length === 0 ? (
+          <p className="text-gray-500 text-center py-8">
+            {sessions.length === 0
+              ? 'Crea prima una sessione per poter aggiungere interventi.'
+              : 'Nessun intervento creato. Clicca su "Crea Nuovo Intervento" per iniziare.'}
+          </p>
+        ) : (
+          <div className="space-y-4">
+            {sessions.map((session) => {
+              const sessionSpeeches = speeches.filter((s) => s.session_id === session.id);
+              if (sessionSpeeches.length === 0) return null;
 
-      {/* Speeches list */}
-      <div className="space-y-2">
-        {speeches.length > 0 ? (
-          speeches.map((speech) => (
-            <div
-              key={speech.id}
-              draggable
-              onDragStart={() => handleDragStart(speech.id)}
-              onDragOver={handleDragOver}
-              onDrop={(e) => handleDrop(e, speech.id)}
-              className="p-4 bg-white border border-gray-200 rounded-lg cursor-move hover:border-blue-500"
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <h4 className="font-medium text-gray-900">{speech.title}</h4>
-                  <p className="text-sm text-gray-600 mt-1">Speaker: {speech.speaker_name}</p>
-                  {speech.description && (
-                    <p className="text-sm text-gray-600 mt-1">{speech.description}</p>
-                  )}
-                  <div className="flex gap-4 mt-2 text-xs text-gray-500">
-                    {speech.duration_minutes && (
-                      <span>Duration: {speech.duration_minutes} min</span>
-                    )}
-                    {speech.scheduled_time && (
-                      <span>
-                        Scheduled: {new Date(speech.scheduled_time).toLocaleString()}
-                      </span>
-                    )}
-                    {speech.display_order !== null && (
-                      <span>Order: {speech.display_order}</span>
-                    )}
+              return (
+                <div key={session.id} className="border rounded-lg overflow-hidden">
+                  {/* Session Header */}
+                  <div className="bg-blue-50 px-4 py-3">
+                    <h3 className="font-semibold text-gray-900">📂 {session.title}</h3>
+                    <p className="text-sm text-gray-600 mt-1">
+                      {new Date(session.start_time).toLocaleDateString('it-IT')}
+                    </p>
+                  </div>
+                  {/* Speeches in this session */}
+                  <div className="divide-y">
+                    {sessionSpeeches.map((speech) => (
+                      <div
+                        key={speech.id}
+                        className="p-4 hover:bg-gray-50 transition flex justify-between items-start"
+                      >
+                        <div className="flex-1">
+                          <h4 className="font-medium text-gray-900">{speech.title}</h4>
+                          {speech.speaker_name && (
+                            <p className="text-sm text-gray-600 mt-1">👤 {speech.speaker_name}</p>
+                          )}
+                          {speech.description && (
+                            <p className="text-sm text-gray-600 mt-1">{speech.description}</p>
+                          )}
+                          {speech.duration && (
+                            <p className="text-xs text-gray-500 mt-1">⏱️ {speech.duration} min</p>
+                          )}
+                        </div>
+
+                        <div className="flex gap-2 ml-4">
+                          <button
+                            onClick={() => startEdit(speech)}
+                            className="px-3 py-1.5 text-sm font-medium text-green-600 hover:text-green-700 hover:bg-green-50 rounded transition"
+                          >
+                            Modifica
+                          </button>
+                          <button
+                            onClick={() => handleDelete(speech)}
+                            className="px-3 py-1.5 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded transition"
+                          >
+                            Elimina
+                          </button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleEditClick(speech)}
-                    className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => handleDeleteSpeech(speech.id, speech.title)}
-                    disabled={loading}
-                    className="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700 disabled:bg-gray-400"
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))
-        ) : (
-          <div className="p-8 bg-gray-50 rounded-lg text-center">
-            <p className="text-gray-500">No speeches yet</p>
+              );
+            })}
           </div>
         )}
       </div>

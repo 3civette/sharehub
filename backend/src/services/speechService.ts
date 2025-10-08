@@ -50,15 +50,14 @@ export class SpeechService {
       displayOrder = getNextDisplayOrder(existing);
     }
 
-    const { data, error } = await this.supabase
+    const { data, error} = await this.supabase
       .from('speeches')
       .insert({
         session_id: input.session_id,
         tenant_id: tenantId,
         title: input.title,
         speaker_name: input.speaker_name,
-        duration: input.duration, // Feature 003 legacy
-        duration_minutes: input.duration_minutes, // Feature 005 preferred
+        // duration: input.duration, // TODO: Re-enable after migration applied
         description: input.description,
         scheduled_time: input.scheduled_time, // Feature 005
         display_order: displayOrder ?? null, // Feature 005: nullable

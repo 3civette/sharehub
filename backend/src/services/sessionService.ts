@@ -43,11 +43,12 @@ export class SessionService {
     // Feature 005: display_order is nullable for chronological auto-ordering
     // If not provided, keep as null (will be ordered by scheduled_time)
     let displayOrder = input.display_order;
-
-    // Legacy behavior: if explicitly requesting next order, calculate it
-    if (displayOrder === undefined && !input.scheduled_time) {
-      const existing = await this.listSessions(input.event_id, tenantId);
+    console.log('Input display_order:', displayOrder, 'type:', typeof displayOrder);
+    if (displayOrder === undefined || displayOrder === null) {
+      const existing = await this.listSessions(tenantId, input.event_id);
+      console.log('Existing sessions count:', existing.length, 'orders:', existing.map(s => s.display_order));
       displayOrder = getNextDisplayOrder(existing);
+      console.log('Calculated next display_order:', displayOrder);
     }
 
     const { data, error } = await this.supabase
@@ -138,12 +139,11 @@ export class SessionService {
 
   /**
    * List sessions for an event
-   * Feature 005: Smart ordering using sortSessionsSmart helper
-   * @param eventId - Event UUID
    * @param tenantId - Tenant UUID
-   * @returns Array of sessions ordered by smart logic (manual display_order or scheduled_time)
+   * @param eventId - Event UUID
+   * @returns Array of sessions ordered by display_order
    */
-  async listSessions(eventId: string, tenantId: string): Promise<Session[]> {
+  async listSessions(tenantId: string, eventId: string): Promise<Session[]> {
     await this.setTenantContext(tenantId);
 
     const { data, error } = await this.supabase
@@ -183,14 +183,14 @@ export class SessionService {
 
   /**
    * Reorder sessions
-   * @param eventId - Event UUID
    * @param tenantId - Tenant UUID
+   * @param eventId - Event UUID
    * @param sessionIds - Array of session IDs in new order
    * @returns Updated sessions
    */
   async reorderSessions(
-    eventId: string,
     tenantId: string,
+    eventId: string,
     sessionIds: string[]
   ): Promise<Session[]> {
     await this.setTenantContext(tenantId);
@@ -207,7 +207,7 @@ export class SessionService {
     await Promise.all(updates);
 
     // Return updated list
-    return this.listSessions(eventId, tenantId);
+    return this.listSessions(tenantId, eventId);
   }
 
   /**

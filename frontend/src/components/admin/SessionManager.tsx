@@ -1,376 +1,367 @@
 'use client';
 
-// SessionManager Component
-// Feature: 005-ora-bisogna-implementare (Event Details Management)
-// Manages event sessions with CRUD operations and smart ordering
+// Feature 005: Session Manager Component
+// Manage sessions (CRUD operations) with date selection from event date
 
-import React, { useState, useEffect } from 'react';
-import {
-  createSession,
-  listSessions,
-  updateSession,
-  deleteSession,
-  reorderSessions,
-  type Session,
-  type CreateSessionInput,
-  type UpdateSessionInput,
-} from '@/services/sessionService';
+import { useState } from 'react';
+
+interface Session {
+  id: string;
+  event_id: string;
+  title: string;
+  description: string | null;
+  start_time: string;
+  end_time: string | null;
+  room: string | null;
+  display_order: number;
+  created_at: string;
+  updated_at: string;
+}
 
 interface SessionManagerProps {
   eventId: string;
-  token: string;
-  onUpdate?: () => void;
+  eventDate: string; // ISO date from event
+  sessions: Session[];
+  accessToken: string;
 }
 
-export default function SessionManager({
-  eventId,
-  token,
-  onUpdate,
-}: SessionManagerProps) {
-  const [sessions, setSessions] = useState<Session[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [editingSession, setEditingSession] = useState<Session | null>(null);
-  const [showForm, setShowForm] = useState(false);
-  const [draggedSessionId, setDraggedSessionId] = useState<string | null>(null);
-  const [formData, setFormData] = useState<CreateSessionInput>({
+export default function SessionManager({ eventId, eventDate, sessions: initialSessions, accessToken }: SessionManagerProps) {
+  const [sessions, setSessions] = useState<Session[]>(initialSessions);
+  const [isCreating, setIsCreating] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [formData, setFormData] = useState({
     title: '',
-    description: null,
-    scheduled_time: null,
-    display_order: null,
+    description: '',
+    start_time: '', // Just time (HH:mm)
+    end_time: '', // Just time (HH:mm)
+    room: '',
   });
 
-  useEffect(() => {
-    loadSessions();
-  }, [eventId]);
-
-  const loadSessions = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await listSessions(eventId, token);
-      setSessions(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load sessions');
-    } finally {
-      setLoading(false);
-    }
+  const resetForm = () => {
+    setFormData({
+      title: '',
+      description: '',
+      start_time: '',
+      end_time: '',
+      room: '',
+    });
+    setIsCreating(false);
+    setEditingId(null);
   };
 
-  const handleCreateSession = async (e: React.FormEvent) => {
+  // Combine event date with time to create ISO datetime
+  const combineDateAndTime = (time: string): string => {
+    if (!time) return '';
+    // eventDate is in format YYYY-MM-DD
+    // time is in format HH:mm
+    return `${eventDate}T${time}:00.000Z`;
+  };
+
+  const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
+
     try {
-      setLoading(true);
-      setError(null);
-      await createSession(eventId, formData, token);
-      await loadSessions();
-      setShowForm(false);
-      setFormData({ title: '', description: null, scheduled_time: null, display_order: null });
-      onUpdate?.();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create session');
-    } finally {
-      setLoading(false);
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/events/${eventId}/sessions`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({
+            title: formData.title,
+            description: formData.description || null,
+            start_time: combineDateAndTime(formData.start_time),
+            end_time: formData.end_time ? combineDateAndTime(formData.end_time) : null,
+            room: formData.room || null,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to create session');
+      }
+
+      const newSession = await response.json();
+      setSessions([...sessions, newSession]);
+      resetForm();
+      alert('Sessione creata con successo!');
+    } catch (error) {
+      console.error('Create session error:', error);
+      alert('Errore nella creazione della sessione');
     }
   };
 
-  const handleUpdateSession = async (e: React.FormEvent) => {
+  const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingSession) return;
+
+    if (!editingId) return;
 
     try {
-      setLoading(true);
-      setError(null);
-      const updateData: UpdateSessionInput = {
-        title: formData.title,
-        description: formData.description,
-        scheduled_time: formData.scheduled_time,
-        display_order: formData.display_order,
-      };
-      await updateSession(editingSession.id, updateData, token);
-      await loadSessions();
-      setEditingSession(null);
-      setFormData({ title: '', description: null, scheduled_time: null, display_order: null });
-      onUpdate?.();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update session');
-    } finally {
-      setLoading(false);
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/events/${eventId}/sessions/${editingId}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({
+            title: formData.title,
+            description: formData.description || null,
+            start_time: combineDateAndTime(formData.start_time),
+            end_time: formData.end_time ? combineDateAndTime(formData.end_time) : null,
+            room: formData.room || null,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to update session');
+      }
+
+      const updatedSession = await response.json();
+      setSessions(sessions.map((s) => (s.id === editingId ? updatedSession : s)));
+      resetForm();
+      alert('Sessione aggiornata con successo!');
+    } catch (error) {
+      console.error('Update session error:', error);
+      alert('Errore nell\'aggiornamento della sessione');
     }
   };
 
-  const handleDeleteSession = async (sessionId: string, sessionTitle: string) => {
-    if (!confirm(`Are you sure you want to delete "${sessionTitle}"? This will fail if the session has speeches.`)) {
+  const handleDelete = async (sessionId: string) => {
+    if (!confirm('Sei sicuro di voler eliminare questa sessione? Questa azione eliminerà anche tutti gli interventi associati e non può essere annullata.')) {
       return;
     }
 
     try {
-      setLoading(true);
-      setError(null);
-      await deleteSession(sessionId, token);
-      await loadSessions();
-      onUpdate?.();
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to delete session';
-      // Show specific error if session has speeches
-      if (errorMessage.includes('speeches')) {
-        setError('Cannot delete session with speeches. Delete all speeches first.');
-      } else {
-        setError(errorMessage);
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/events/${eventId}/sessions/${sessionId}`,
+        {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to delete session');
       }
-    } finally {
-      setLoading(false);
+
+      setSessions(sessions.filter((s) => s.id !== sessionId));
+      alert('Sessione eliminata con successo!');
+    } catch (error) {
+      console.error('Delete session error:', error);
+      alert('Errore nell\'eliminazione della sessione');
     }
   };
 
-  const handleEditClick = (session: Session) => {
-    setEditingSession(session);
+  const startEdit = (session: Session) => {
+    // Extract time from ISO datetime (session.start_time is like "2024-10-08T14:30:00Z")
+    const extractTime = (isoDateTime: string) => {
+      const date = new Date(isoDateTime);
+      return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+    };
+
     setFormData({
       title: session.title,
-      description: session.description,
-      scheduled_time: session.scheduled_time,
-      display_order: session.display_order,
+      description: session.description || '',
+      start_time: extractTime(session.start_time),
+      end_time: session.end_time ? extractTime(session.end_time) : '',
+      room: session.room || '',
     });
-    setShowForm(false);
+    setEditingId(session.id);
+    setIsCreating(false);
   };
 
-  const handleCancelEdit = () => {
-    setEditingSession(null);
-    setFormData({ title: '', description: null, scheduled_time: null, display_order: null });
+  const formatDateTime = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleString('it-IT', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
   };
 
-  const handleDragStart = (sessionId: string) => {
-    setDraggedSessionId(sessionId);
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-  };
-
-  const handleDrop = async (e: React.DragEvent, targetSessionId: string) => {
-    e.preventDefault();
-    if (!draggedSessionId || draggedSessionId === targetSessionId) return;
-
-    const draggedIndex = sessions.findIndex((s) => s.id === draggedSessionId);
-    const targetIndex = sessions.findIndex((s) => s.id === targetSessionId);
-
-    if (draggedIndex === -1 || targetIndex === -1) return;
-
-    // Reorder array
-    const newOrder = [...sessions];
-    const [draggedSession] = newOrder.splice(draggedIndex, 1);
-    newOrder.splice(targetIndex, 0, draggedSession);
-
-    // Update display immediately
-    setSessions(newOrder);
-
-    // Check if any sessions have scheduled times
-    const hasScheduledTimes = newOrder.some((s) => s.scheduled_time);
-    if (hasScheduledTimes) {
-      const proceed = confirm(
-        'Some sessions have scheduled times. Manual reordering will override automatic time-based ordering. Continue?'
-      );
-      if (!proceed) {
-        await loadSessions(); // Restore original order
-        setDraggedSessionId(null);
-        return;
-      }
-    }
-
-    // Save to backend
-    try {
-      setError(null);
-      await reorderSessions(
-        eventId,
-        newOrder.map((s) => s.id),
-        token
-      );
-      await loadSessions();
-      onUpdate?.();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to reorder sessions');
-      await loadSessions(); // Reload on error
-    } finally {
-      setDraggedSessionId(null);
-    }
+  const formatEventDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('it-IT', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
   };
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-medium text-gray-900">Sessions</h3>
-        <button
-          onClick={() => {
-            setShowForm(!showForm);
-            setEditingSession(null);
-            setFormData({ title: '', description: null, scheduled_time: null, display_order: null });
-          }}
-          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-        >
-          {showForm ? 'Cancel' : 'Add Session'}
-        </button>
+      {/* Event Date Info */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <p className="text-blue-900">
+          📅 <strong>Data dell'evento:</strong> {formatEventDate(eventDate)}
+        </p>
+        <p className="text-sm text-blue-700 mt-1">
+          Le sessioni verranno create per questa data. Indica solo gli orari di inizio e fine.
+        </p>
       </div>
 
-      {error && (
-        <div className="p-4 bg-red-50 border border-red-200 rounded-md">
-          <p className="text-sm text-red-800">{error}</p>
+      {/* Create Button */}
+      {!isCreating && !editingId && (
+        <button
+          onClick={() => setIsCreating(true)}
+          className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition"
+        >
+          + Crea Nuova Sessione
+        </button>
+      )}
+
+      {/* Create/Edit Form */}
+      {(isCreating || editingId) && (
+        <div className="bg-white shadow rounded-lg p-6">
+          <h2 className="text-xl font-bold text-gray-900 mb-4">
+            {editingId ? 'Modifica Sessione' : 'Crea Nuova Sessione'}
+          </h2>
+
+          <form onSubmit={editingId ? handleUpdate : handleCreate} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Titolo <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={formData.title}
+                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+                maxLength={100}
+                placeholder="es. Sessione Mattutina"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Descrizione
+              </label>
+              <textarea
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                rows={3}
+                maxLength={500}
+                placeholder="Descrizione opzionale della sessione"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Orario di Inizio <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="time"
+                  value={formData.start_time}
+                  onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+                <p className="text-xs text-gray-500 mt-1">Sarà nella data: {formatEventDate(eventDate)}</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Orario di Fine
+                </label>
+                <input
+                  type="time"
+                  value={formData.end_time}
+                  onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Sala/Luogo
+              </label>
+              <input
+                type="text"
+                value={formData.room}
+                onChange={(e) => setFormData({ ...formData, room: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                maxLength={50}
+                placeholder="es. Sala Conferenze A"
+              />
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                type="submit"
+                className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition"
+              >
+                {editingId ? 'Salva Modifiche' : 'Crea Sessione'}
+              </button>
+              <button
+                type="button"
+                onClick={resetForm}
+                className="px-4 py-2 bg-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-300 transition"
+              >
+                Annulla
+              </button>
+            </div>
+          </form>
         </div>
       )}
 
-      {/* Create form */}
-      {showForm && (
-        <form onSubmit={handleCreateSession} className="p-4 bg-gray-50 rounded-lg space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Title *
-            </label>
-            <input
-              type="text"
-              required
-              value={formData.title}
-              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Description
-            </label>
-            <textarea
-              value={formData.description || ''}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value || null })}
-              rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Scheduled Time
-            </label>
-            <input
-              type="datetime-local"
-              value={formData.scheduled_time || ''}
-              onChange={(e) => setFormData({ ...formData, scheduled_time: e.target.value || null })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={loading}
-            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-gray-400"
-          >
-            {loading ? 'Creating...' : 'Create Session'}
-          </button>
-        </form>
-      )}
+      {/* Sessions List */}
+      <div className="bg-white shadow rounded-lg p-6">
+        <h2 className="text-xl font-bold text-gray-900 mb-4">Sessioni ({sessions.length})</h2>
 
-      {/* Edit form */}
-      {editingSession && (
-        <form onSubmit={handleUpdateSession} className="p-4 bg-blue-50 rounded-lg space-y-4">
-          <h4 className="font-medium text-gray-900">Edit Session</h4>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Title *
-            </label>
-            <input
-              type="text"
-              required
-              value={formData.title}
-              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Description
-            </label>
-            <textarea
-              value={formData.description || ''}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value || null })}
-              rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Scheduled Time
-            </label>
-            <input
-              type="datetime-local"
-              value={formData.scheduled_time || ''}
-              onChange={(e) => setFormData({ ...formData, scheduled_time: e.target.value || null })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
-            />
-          </div>
-          <div className="flex gap-2">
-            <button
-              type="submit"
-              disabled={loading}
-              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-gray-400"
-            >
-              {loading ? 'Saving...' : 'Save Changes'}
-            </button>
-            <button
-              type="button"
-              onClick={handleCancelEdit}
-              className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400"
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
-      )}
+        {sessions.length === 0 ? (
+          <p className="text-gray-500 text-center py-8">
+            Nessuna sessione creata. Clicca su "Crea Nuova Sessione" per iniziare.
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {sessions.map((session) => (
+              <div
+                key={session.id}
+                className="border rounded-lg p-4 hover:bg-gray-50 transition"
+              >
+                <div className="flex justify-between items-start">
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-gray-900 text-lg">{session.title}</h3>
+                    {session.description && (
+                      <p className="text-sm text-gray-600 mt-1">{session.description}</p>
+                    )}
+                    <div className="flex flex-wrap gap-3 mt-2 text-sm text-gray-500">
+                      <span>🕐 {formatDateTime(session.start_time)}</span>
+                      {session.end_time && (
+                        <span>→ {formatDateTime(session.end_time)}</span>
+                      )}
+                      {session.room && <span>📍 {session.room}</span>}
+                    </div>
+                  </div>
 
-      {/* Sessions list */}
-      <div className="space-y-2">
-        {sessions.length > 0 ? (
-          sessions.map((session) => (
-            <div
-              key={session.id}
-              draggable
-              onDragStart={() => handleDragStart(session.id)}
-              onDragOver={handleDragOver}
-              onDrop={(e) => handleDrop(e, session.id)}
-              className="p-4 bg-white border border-gray-200 rounded-lg cursor-move hover:border-blue-500"
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <h4 className="font-medium text-gray-900">{session.title}</h4>
-                  {session.description && (
-                    <p className="text-sm text-gray-600 mt-1">{session.description}</p>
-                  )}
-                  <div className="flex gap-4 mt-2 text-xs text-gray-500">
-                    {session.scheduled_time && (
-                      <span>
-                        Scheduled: {new Date(session.scheduled_time).toLocaleString()}
-                      </span>
-                    )}
-                    {session.display_order !== null && (
-                      <span>Order: {session.display_order}</span>
-                    )}
+                  <div className="flex gap-2 ml-4">
+                    <button
+                      onClick={() => startEdit(session)}
+                      className="px-3 py-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded transition"
+                    >
+                      Modifica
+                    </button>
+                    <button
+                      onClick={() => handleDelete(session.id)}
+                      className="px-3 py-1.5 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded transition"
+                    >
+                      Elimina
+                    </button>
                   </div>
                 </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleEditClick(session)}
-                    className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => handleDeleteSession(session.id, session.title)}
-                    disabled={loading}
-                    className="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700 disabled:bg-gray-400"
-                  >
-                    Delete
-                  </button>
-                </div>
               </div>
-            </div>
-          ))
-        ) : (
-          <div className="p-8 bg-gray-50 rounded-lg text-center">
-            <p className="text-gray-500">No sessions yet</p>
+            ))}
           </div>
         )}
       </div>

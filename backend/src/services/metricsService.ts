@@ -1,10 +1,11 @@
 /**
  * Metrics Service
  * Purpose: Track and retrieve event analytics with tier-based access
- * Feature: 003-ora-facciamo-il
+ * Features: 003-ora-facciamo-il, 005-ora-facciamo-la
  */
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import NodeCache from 'node-cache';
 import type {
   EventMetrics,
   TrackPageViewInput,
@@ -22,6 +23,9 @@ import {
 // Initialize Supabase client
 const supabaseUrl = process.env.SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+
+// Initialize cache for metrics (5-minute TTL)
+const metricsCache = new NodeCache({ stdTTL: 300 }); // 300 seconds = 5 minutes
 
 export class MetricsService {
   private supabase: SupabaseClient;
@@ -250,107 +254,61 @@ export class MetricsService {
   }
 
   /**
-   * Feature 005: Track photo view
+   * Get cached metrics summary for dashboard
+   * Feature: 005-ora-facciamo-la
    * @param eventId - Event UUID
    * @param tenantId - Tenant UUID
-   * @param photoId - Photo UUID
-   * @returns Updated metrics
+   * @returns Simplified metrics with cache timestamp
    */
-  async trackPhotoView(eventId: string, tenantId: string, photoId: string): Promise<void> {
+  async getCachedMetrics(eventId: string, tenantId: string): Promise<{
+    pageViews: number;
+    slideDownloads: number;
+    participantCount: number;
+    lastRefreshed: string;
+  }> {
+    const cacheKey = `metrics:${eventId}`;
+
+    // Check cache first
+    const cached = metricsCache.get<{
+      pageViews: number;
+      slideDownloads: number;
+      participantCount: number;
+      lastRefreshed: string;
+    }>(cacheKey);
+
+    if (cached) {
+      return cached;
+    }
+
+    // Cache miss - calculate fresh metrics
     await this.setTenantContext(tenantId);
 
-    // Get current metrics
-    const { data: current } = await this.supabase
+    // Get event metrics
+    const { data: metrics, error: metricsError } = await this.supabase
       .from('event_metrics')
-      .select('*')
+      .select('page_views, downloads')
       .eq('event_id', eventId)
       .single();
 
-    if (!current) {
-      return; // Silently skip if metrics don't exist
-    }
-
-    const metrics = current as EventMetrics;
-
-    // Add timeline entry
-    const updates = addTimelineEntry(metrics, {
-      timestamp: new Date().toISOString(),
-      actor_type: 'anonymous',
-      action: 'photo_view'
-    });
-
-    await this.supabase
-      .from('event_metrics')
-      .update(updates)
-      .eq('event_id', eventId);
-  }
-
-  /**
-   * Feature 005: Track session view
-   * @param eventId - Event UUID
-   * @param tenantId - Tenant UUID
-   * @param sessionId - Session UUID
-   * @returns Updated metrics
-   */
-  async trackSessionView(eventId: string, tenantId: string, sessionId: string): Promise<void> {
-    await this.setTenantContext(tenantId);
-
-    const { data: current } = await this.supabase
-      .from('event_metrics')
-      .select('*')
+    // Count participant token usage
+    const { count: participantCount } = await this.supabase
+      .from('access_tokens')
+      .select('*', { count: 'exact', head: true })
       .eq('event_id', eventId)
-      .single();
+      .eq('type', 'participant')
+      .not('last_used_at', 'is', null);
 
-    if (!current) {
-      return;
-    }
+    const summary = {
+      pageViews: metrics?.page_views || 0,
+      slideDownloads: metrics?.downloads || 0,
+      participantCount: participantCount || 0,
+      lastRefreshed: new Date().toISOString(),
+    };
 
-    const metrics = current as EventMetrics;
+    // Store in cache
+    metricsCache.set(cacheKey, summary);
 
-    const updates = addTimelineEntry(metrics, {
-      timestamp: new Date().toISOString(),
-      actor_type: 'anonymous',
-      action: 'session_view'
-    });
-
-    await this.supabase
-      .from('event_metrics')
-      .update(updates)
-      .eq('event_id', eventId);
-  }
-
-  /**
-   * Feature 005: Track speech view
-   * @param eventId - Event UUID
-   * @param tenantId - Tenant UUID
-   * @param speechId - Speech UUID
-   * @returns Updated metrics
-   */
-  async trackSpeechView(eventId: string, tenantId: string, speechId: string): Promise<void> {
-    await this.setTenantContext(tenantId);
-
-    const { data: current } = await this.supabase
-      .from('event_metrics')
-      .select('*')
-      .eq('event_id', eventId)
-      .single();
-
-    if (!current) {
-      return;
-    }
-
-    const metrics = current as EventMetrics;
-
-    const updates = addTimelineEntry(metrics, {
-      timestamp: new Date().toISOString(),
-      actor_type: 'anonymous',
-      action: 'speech_view'
-    });
-
-    await this.supabase
-      .from('event_metrics')
-      .update(updates)
-      .eq('event_id', eventId);
+    return summary;
   }
 }
 
