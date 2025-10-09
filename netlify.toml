@@ -1,0 +1,45 @@
+# Netlify Configuration for ShareHub Frontend
+# https://docs.netlify.com/configure-builds/file-based-configuration/
+
+[build]
+  # Base directory for the frontend
+  base = "frontend"
+
+  # Build command
+  command = "npm run build"
+
+  # Output directory (Next.js builds to .next)
+  publish = ".next"
+
+[build.environment]
+  # Node version
+  NODE_VERSION = "20"
+
+  # Next.js specific
+  NEXT_TELEMETRY_DISABLED = "1"
+
+# Redirect rules for Next.js
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Headers for security and performance
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-XSS-Protection = "1; mode=block"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
+# Cache static assets
+[[headers]]
+  for = "/static/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# Environment variables needed (set in Netlify dashboard):
+# - NEXT_PUBLIC_SUPABASE_URL
+# - NEXT_PUBLIC_SUPABASE_ANON_KEY
+# - NEXT_PUBLIC_API_URL (URL of deployed backend)
