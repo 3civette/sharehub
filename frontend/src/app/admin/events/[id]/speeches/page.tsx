@@ -68,7 +68,7 @@ export default async function SpeechesPage({ params }: PageProps) {
           <div className="mb-6">
             <a
               href={`/admin/events/${params.id}/dashboard`}
-              className="text-blue-600 hover:text-blue-800 flex items-center gap-2"
+              className="text-primary hover:text-primary/90 flex items-center gap-2"
             >
               ← Torna alla Dashboard
             </a>
@@ -76,8 +76,8 @@ export default async function SpeechesPage({ params }: PageProps) {
 
           {/* Page Title */}
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900">Gestione Interventi</h1>
-            <p className="text-gray-600 mt-2">Evento: {event.name}</p>
+            <h1 className="text-3xl font-bold text-brandBlack">Gestione Interventi</h1>
+            <p className="text-brandInk/70 mt-2">Evento: {event.name}</p>
           </div>
 
           {/* Speech Manager Component */}
@@ -97,13 +97,13 @@ export default async function SpeechesPage({ params }: PageProps) {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="bg-white shadow rounded-lg p-8 max-w-md">
           <h1 className="text-2xl font-bold text-red-600 mb-4">Errore</h1>
-          <p className="text-gray-700 mb-4">
+          <p className="text-brandInk mb-4">
             Si è verificato un errore nel caricamento degli interventi.
           </p>
-          <p className="text-sm text-gray-500 mb-4">{error.message}</p>
+          <p className="text-sm text-brandInk/70 mb-4">{error.message}</p>
           <a
             href={`/admin/events/${params.id}/dashboard`}
-            className="block text-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            className="block text-center px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90"
           >
             Torna alla Dashboard
           </a>

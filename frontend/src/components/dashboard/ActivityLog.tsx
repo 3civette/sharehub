@@ -1,5 +1,7 @@
 'use client';
 
+import { User, Upload, Eye, Zap } from 'lucide-react';
+
 interface Activity {
   id: string;
   actor_type: 'admin' | 'organizer' | 'participant' | 'system';
@@ -16,30 +18,13 @@ export default function ActivityLog({ activities }: ActivityLogProps) {
   const getActivityIcon = (actorType: string) => {
     switch (actorType) {
       case 'admin':
-        return (
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-          </svg>
-        );
+        return <User className="w-5 h-5" />;
       case 'organizer':
-        return (
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-          </svg>
-        );
+        return <Upload className="w-5 h-5" />;
       case 'participant':
-        return (
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-          </svg>
-        );
+        return <Eye className="w-5 h-5" />;
       default:
-        return (
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-          </svg>
-        );
+        return <Zap className="w-5 h-5" />;
     }
   };
 
@@ -81,43 +66,43 @@ export default function ActivityLog({ activities }: ActivityLogProps) {
   const getActorColor = (actorType: string) => {
     switch (actorType) {
       case 'admin':
-        return 'bg-blue-100 text-blue-700';
+        return 'bg-primary/10 text-primary';
       case 'organizer':
         return 'bg-green-100 text-green-700';
       case 'participant':
-        return 'bg-purple-100 text-purple-700';
+        return 'bg-secondary/10 text-secondary';
       default:
-        return 'bg-gray-100 text-gray-700';
+        return 'bg-brandSilver text-brandInk';
     }
   };
 
   if (!activities || activities.length === 0) {
     return (
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Attività Recenti</h3>
-        <p className="text-gray-500 text-center py-8">Nessuna attività recente</p>
+      <div className="bg-white rounded-lg shadow-card p-6">
+        <h3 className="text-lg font-semibold text-brandBlack mb-4">Attività Recenti</h3>
+        <p className="text-brandInk/50 text-center py-8">Nessuna attività recente</p>
       </div>
     );
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4">Attività Recenti</h3>
+    <div className="bg-white rounded-lg shadow-card p-6">
+      <h3 className="text-lg font-semibold text-brandBlack mb-4">Attività Recenti</h3>
       <div className="space-y-3">
         {activities.map((activity) => (
           <div
             key={activity.id}
-            className="flex items-start gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors"
+            className="flex items-start gap-3 p-3 rounded-lg hover:bg-bgSoft transition-colors"
           >
             <div className={`p-2 rounded-full ${getActorColor(activity.actor_type)}`}>
               {getActivityIcon(activity.actor_type)}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm text-gray-900">
+              <p className="text-sm text-brandBlack">
                 <span className="font-medium capitalize">{activity.actor_type}</span>{' '}
                 {getActionDescription(activity)}
               </p>
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-brandInk/50 mt-1">
                 {formatTimestamp(activity.created_at)}
               </p>
             </div>

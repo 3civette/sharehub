@@ -3,10 +3,11 @@
 import { useEffect, useState } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter } from 'next/navigation';
+import { Calendar, Clock, AlertCircle } from 'lucide-react';
 import MetricCard from '@/components/dashboard/MetricCard';
 import UpcomingEvents from '@/components/dashboard/UpcomingEvents';
 import QuickActions from '@/components/dashboard/QuickActions';
-import UpcomingEvents from '@/components/dashboard/UpcomingEvents';
+import ActivityLog from '@/components/dashboard/ActivityLog';
 
 interface DashboardMetrics {
   active_events_count: number;
@@ -22,6 +23,14 @@ interface Event {
   slug: string;
 }
 
+interface Activity {
+  id: string;
+  actor_type: 'admin' | 'organizer' | 'participant' | 'system';
+  action_type: string;
+  metadata: Record<string, any>;
+  created_at: string;
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const supabase = createClientComponentClient();
@@ -29,6 +38,7 @@ export default function DashboardPage() {
   const [tenantId, setTenantId] = useState<string | null>(null);
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [upcomingEvents, setUpcomingEvents] = useState<Event[]>([]);
+  const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -82,6 +92,20 @@ export default function DashboardPage() {
           setUpcomingEvents(eventsData || []);
         }
 
+        // Fetch recent activities
+        const { data: activitiesData, error: activitiesError } = await supabase
+          .from('activity_logs')
+          .select('*')
+          .eq('tenant_id', adminData.tenant_id)
+          .order('timestamp', { ascending: false })
+          .limit(10);
+
+        if (activitiesError) {
+          console.error('Error loading activities:', activitiesError);
+        } else {
+          setActivities(activitiesData || []);
+        }
+
         setLoading(false);
       } catch (err: any) {
         console.error('Dashboard error:', err);
@@ -117,10 +141,10 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center">
+      <div className="flex items-center justify-center min-h-[60vh]">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Caricamento dashboard...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-brandInk/70">Caricamento dashboard...</p>
         </div>
       </div>
     );
@@ -128,18 +152,16 @@ export default function DashboardPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center">
-        <div className="bg-white rounded-lg shadow-lg p-8 max-w-md">
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="bg-white rounded-lg shadow-card p-8 max-w-md">
           <div className="text-red-500 mb-4">
-            <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
+            <AlertCircle className="w-12 h-12 mx-auto" />
           </div>
-          <h2 className="text-xl font-bold text-gray-900 text-center mb-2">Errore</h2>
-          <p className="text-gray-600 text-center mb-4">{error}</p>
+          <h2 className="text-xl font-bold text-brandBlack text-center mb-2">Errore</h2>
+          <p className="text-brandInk/70 text-center mb-4">{error}</p>
           <button
             onClick={() => router.push('/login')}
-            className="w-full py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            className="w-full py-2 bg-primary text-white rounded-lg hover:bg-primary/90 active:scale-95 transition-all shadow-button"
           >
             Torna al Login
           </button>
@@ -149,18 +171,18 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+    <>
       {/* Header */}
-      <header className="bg-white shadow-sm">
+      <header className="bg-white/80 backdrop-blur-sm shadow-sm border-b border-brandSilver/30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-              <p className="text-sm text-gray-600 mt-1">Panoramica del tuo account ShareHub</p>
+              <h1 className="text-2xl font-bold text-brandBlack">Dashboard</h1>
+              <p className="text-sm text-brandInk/70 mt-1">Panoramica del tuo account Meeting Hub</p>
             </div>
             <button
               onClick={handleLogout}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              className="px-4 py-2 text-sm font-medium text-brandInk bg-white border border-brandSilver rounded-lg hover:bg-bgSoft active:scale-95 transition-all"
             >
               Esci
             </button>
@@ -176,21 +198,13 @@ export default function DashboardPage() {
             title="Eventi Attivi"
             value={metrics?.active_events_count || 0}
             trend={metrics && metrics.active_events_count > 0 ? 'up' : 'neutral'}
-            icon={
-              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-            }
+            icon={<Calendar className="w-6 h-6" />}
           />
 
           <MetricCard
             title="Ultima Attività"
             value={formatLastActivity(metrics?.last_activity_at || null)}
-            icon={
-              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            }
+            icon={<Clock className="w-6 h-6" />}
           />
         </div>
 
@@ -207,6 +221,6 @@ export default function DashboardPage() {
         {/* Recent Activity */}
         <ActivityLog activities={activities} />
       </main>
-    </div>
+    </>
   );
 }

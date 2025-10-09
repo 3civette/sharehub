@@ -104,7 +104,7 @@ export default function AdminNav() {
   };
 
   return (
-    <nav className="bg-white shadow-sm border-b border-gray-200">
+    <nav className="bg-white shadow-md border-b border-brandSilver/30">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex space-x-8 overflow-x-auto">
           {navItems.map((item) => {
@@ -113,10 +113,10 @@ export default function AdminNav() {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center gap-2 py-4 px-1 border-b-2 text-sm font-medium transition-colors whitespace-nowrap ${
+                className={`flex items-center gap-2 py-4 px-3 border-b-2 text-sm font-medium transition-all duration-200 whitespace-nowrap active:scale-95 active:brightness-90 ${
                   active
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
+                    ? 'border-primary text-primary bg-primary/5'
+                    : 'border-transparent text-brandInk/70 hover:text-brandBlack hover:border-primary/30 hover:bg-primary/5'
                 }`}
               >
                 {item.icon}

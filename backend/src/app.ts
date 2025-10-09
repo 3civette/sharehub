@@ -68,6 +68,9 @@ app.use('/api/admin', adminSessionRoutes);
 app.use('/api/admin', adminSpeechRoutes);
 app.use('/api/admin', adminSlideRoutes);
 
+// Design System & Branding Validation (Feature 007)
+app.use('/api/admin/branding', adminAuth, adminBrandingRouter);
+
 // Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

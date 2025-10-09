@@ -129,17 +129,17 @@ export default function AdminSettingsPage() {
 
   if (tenantLoading || loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+      <div className="min-h-screen bg-gradient-to-br from-primary/5 via-white to-secondary/5">
         <header className="bg-white shadow-sm">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            <h1 className="text-2xl font-bold text-gray-900">Caricamento...</h1>
+            <h1 className="text-2xl font-bold text-brandBlack">Caricamento...</h1>
           </div>
         </header>
         <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="flex items-center justify-center py-12">
             <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-              <p className="text-gray-600">Caricamento impostazioni...</p>
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+              <p className="text-brandInk/70">Caricamento impostazioni...</p>
             </div>
           </div>
         </main>
@@ -149,10 +149,10 @@ export default function AdminSettingsPage() {
 
   if (error && !settings) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+      <div className="min-h-screen bg-gradient-to-br from-primary/5 via-white to-secondary/5">
         <header className="bg-white shadow-sm">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            <h1 className="text-2xl font-bold text-gray-900">Errore</h1>
+            <h1 className="text-2xl font-bold text-brandBlack">Errore</h1>
           </div>
         </header>
         <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -172,11 +172,11 @@ export default function AdminSettingsPage() {
                 />
               </svg>
               <div>
-                <h3 className="text-lg font-medium text-gray-900">Errore</h3>
-                <p className="text-sm text-gray-600 mt-1">{error}</p>
+                <h3 className="text-lg font-medium text-brandBlack">Errore</h3>
+                <p className="text-sm text-brandInk/70 mt-1">{error}</p>
                 <button
                   onClick={() => router.push('/admin/dashboard')}
-                  className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm"
+                  className="mt-4 px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors text-sm"
                 >
                   Torna alla Dashboard
                 </button>
@@ -193,7 +193,7 @@ export default function AdminSettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-white to-secondary/5">
       <AdminHeader
         title="Impostazioni"
         subtitle="Gestisci le impostazioni del tuo account"

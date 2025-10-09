@@ -52,15 +52,15 @@ export default async function SlidesUploadPage({ params }: PageProps) {
           <div className="mb-6">
             <a
               href={`/admin/events/${params.id}/dashboard`}
-              className="text-blue-600 hover:text-blue-800 flex items-center gap-2"
+              className="text-primary hover:text-primary/90 flex items-center gap-2"
             >
               ← Torna alla Dashboard
             </a>
           </div>
 
           {/* Page Title */}
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Upload Slide</h1>
-          <p className="text-gray-600 mb-8">
+          <h1 className="text-3xl font-bold text-brandBlack mb-2">Upload Slide</h1>
+          <p className="text-brandInk/70 mb-8">
             Intervento: <span className="font-semibold">{speech.title}</span>
             {speech.speaker_name && ` - ${speech.speaker_name}`}
           </p>
@@ -80,12 +80,12 @@ export default async function SlidesUploadPage({ params }: PageProps) {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="bg-white shadow rounded-lg p-8 max-w-md">
           <h1 className="text-2xl font-bold text-red-600 mb-4">Errore</h1>
-          <p className="text-gray-700 mb-4">
+          <p className="text-brandInk mb-4">
             Impossibile caricare la pagina di upload slide.
           </p>
           <a
             href={`/admin/events/${params.id}/dashboard`}
-            className="block text-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            className="block text-center px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90"
           >
             Torna alla Dashboard
           </a>

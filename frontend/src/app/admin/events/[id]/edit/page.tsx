@@ -31,6 +31,7 @@ export default function EditEventPage() {
   const eventId = params.id as string;
 
   const [event, setEvent] = useState<Event | null>(null);
+  const [sessions, setSessions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -80,6 +81,19 @@ export default function EditEventPage() {
       const eventData = await response.json();
       setEvent(eventData);
       setAuthToken(token);
+
+      // Fetch sessions for this event
+      const { data: sessionsData, error: sessionsError } = await supabase
+        .from('sessions')
+        .select('*')
+        .eq('event_id', eventId)
+        .order('display_order', { ascending: true });
+
+      if (sessionsError) {
+        console.error('Error fetching sessions:', sessionsError);
+      } else {
+        setSessions(sessionsData || []);
+      }
     } catch (err: any) {
       console.error('Error fetching event:', err);
       setError(err.message || 'Errore nel caricamento dell\'evento');
@@ -377,11 +391,9 @@ export default function EditEventPage() {
           {activeTab === 'sessions' && authToken && (
             <SessionManager
               eventId={eventId}
-              token={authToken}
-              onUpdate={() => {
-                // Optionally refresh event data
-                fetchEvent();
-              }}
+              eventDate={event.date}
+              sessions={sessions}
+              accessToken={authToken}
             />
           )}
 

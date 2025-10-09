@@ -10,6 +10,8 @@ Auto-generated from all feature plans. Last updated: 2025-10-06
 - Supabase PostgreSQL with RLS policies, Supabase Storage for slide files (003-ora-facciamo-il)
 - TypeScript 5.3+ (Node.js 20 LTS backend, React 18 frontend) + Express.js (backend API), Next.js 14 App Router (frontend), Supabase (database + auth + storage), Tailwind CSS (styling), archiver (ZIP generation) (004-facciamo-la-pagina)
 - Supabase PostgreSQL with existing RLS policies (005-ora-facciamo-la)
+- TypeScript 5.3+ (Node.js 20 LTS backend, React 18 frontend) + Next.js 14 App Router, Tailwind CSS 3.x, Lucide React, Supabase Client (007-voglio-che-l)
+- Supabase PostgreSQL (existing schema unchanged), Supabase Storage (for tenant logos) (007-voglio-che-l)
 
 ## Project Structure
 ```
@@ -25,9 +27,9 @@ npm test; npm run lint
 TypeScript 5.3+ (Node.js 20 LTS for backend, React 18 for frontend): Follow standard conventions
 
 ## Recent Changes
+- 007-voglio-che-l: Added TypeScript 5.3+ (Node.js 20 LTS backend, React 18 frontend) + Next.js 14 App Router, Tailwind CSS 3.x, Lucide React, Supabase Client
 - 005-ora-facciamo-la: Added TypeScript 5.3+ (Node.js 20 LTS backend, React 18 frontend)
 - 004-facciamo-la-pagina: Added TypeScript 5.3+ (Node.js 20 LTS backend, React 18 frontend) + Express.js (backend API), Next.js 14 App Router (frontend), Supabase (database + auth + storage), Tailwind CSS (styling), archiver (ZIP generation)
-- 003-ora-facciamo-il: Added TypeScript 5.3+ (Node.js 20 LTS backend, React 18 frontend) + Express.js (backend), Next.js 14 App Router (frontend), Supabase (database + auth + storage), Tailwind CSS (styling)
 
 <!-- MANUAL ADDITIONS START -->
 

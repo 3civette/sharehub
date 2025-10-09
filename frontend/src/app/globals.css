@@ -3,9 +3,30 @@
 @tailwind utilities;
 
 :root {
-  --color-primary: #2563eb;
-  --color-secondary: #64748b;
-  --font-family: system-ui, -apple-system, sans-serif;
+  /* 3Civette Design System - Default Colors */
+  --color-primary: #D4AF37; /* Gold */
+  --color-secondary: #0B0B0C; /* Brand Black */
+
+  /* These will be dynamically overridden by TenantContext when custom branding exists */
+  --color-brand-black: #0B0B0C;
+  --color-brand-ink: #111827;
+  --color-brand-gold: #D4AF37;
+  --color-brand-silver: #E5E7EB;
+
+  /* Fonts */
+  --font-display: "Archivo Black", "Bebas Neue", system-ui, sans-serif;
+  --font-sans: Inter, ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+  body {
+    @apply font-sans text-brand-ink;
+    line-height: 1.6;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display;
+  }
 }
 
 @layer utilities {

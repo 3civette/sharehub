@@ -45,6 +45,8 @@ export interface Event {
 
   // Core attributes
   name: string;
+  title: string; // Display title (distinct from slug)
+  organizer?: string; // Event organizer name
   date: string; // ISO date format (YYYY-MM-DD)
   description?: string;
 
@@ -98,6 +100,8 @@ export const createEventSchema = z
   .object({
     slug: slugSchema,
     name: z.string().min(1, 'Name is required').max(200, 'Name must be at most 200 characters'),
+    title: z.string().min(1, 'Title is required').max(300, 'Title must be at most 300 characters'),
+    organizer: z.string().max(200, 'Organizer name must be at most 200 characters').optional(),
     date: eventDateSchema,
     description: z.string().optional(),
     visibility: z.enum([EventVisibility.PUBLIC, EventVisibility.PRIVATE]),
@@ -135,6 +139,8 @@ export const updateEventSchema = z
   .object({
     slug: slugSchema.optional(),
     name: z.string().min(1).max(200).optional(),
+    title: z.string().min(1).max(300).optional(),
+    organizer: z.string().max(200).optional(),
     date: eventDateSchema.optional(),
     description: z.string().optional(),
     visibility: z.enum([EventVisibility.PUBLIC, EventVisibility.PRIVATE]).optional(),

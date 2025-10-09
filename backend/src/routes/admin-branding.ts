@@ -1,9 +1,11 @@
 // Admin Branding Routes
 // Feature: 002-facciamo-tutti-gli (Admin Panel Secondary Screens)
+// Feature: 007-voglio-che-l (Design System + Color Validation)
 
 import express from 'express';
 import multer from 'multer';
 import * as brandingService from '../services/brandingService';
+import { validateBrandingColors } from '../validators/colorValidator';
 
 const router = express.Router();
 
@@ -135,6 +137,43 @@ router.post('/:tenantId/reset', async (req, res) => {
     }
 
     res.status(500).json({ message: 'Failed to reset branding' });
+  }
+});
+
+// POST /branding/validate-colors - Validate color contrast for WCAG AA compliance
+// Feature: 007-voglio-che-l (Design System)
+router.post('/validate-colors', async (req, res) => {
+  try {
+    const { primary, secondary, background } = req.body;
+
+    // Validate that required fields are present
+    if (!primary || !secondary || !background) {
+      return res.status(400).json({
+        error: 'Missing required fields',
+        message: 'primary, secondary, and background colors are required'
+      });
+    }
+
+    // Validate and calculate contrast ratios
+    const result = validateBrandingColors(primary, secondary, background);
+
+    // Always return 200 with validation results
+    res.json(result);
+  } catch (error: any) {
+    console.error('Validate colors error:', error);
+
+    // Return 400 for validation errors (invalid hex format)
+    if (error.message.includes('hex format')) {
+      return res.status(400).json({
+        error: 'Invalid color format',
+        message: error.message
+      });
+    }
+
+    res.status(500).json({
+      error: 'Validation failed',
+      message: error.message
+    });
   }
 });
 

@@ -94,7 +94,6 @@ export default function SpeechManager({ eventId, sessions, speeches: initialSpee
       const session = sessions.find(s => s.id === formData.session_id);
       setSpeeches([...speeches, { ...newSpeech, session: { id: session!.id, title: session!.title } }]);
       resetForm();
-      alert('Intervento creato con successo!');
     } catch (error) {
       console.error('Create speech error:', error);
       alert('Errore nella creazione dell\'intervento');
@@ -132,7 +131,6 @@ export default function SpeechManager({ eventId, sessions, speeches: initialSpee
       const session = sessions.find(s => s.id === formData.session_id);
       setSpeeches(speeches.map((s) => (s.id === editingId ? { ...updatedSpeech, session: { id: session!.id, title: session!.title } } : s)));
       resetForm();
-      alert('Intervento aggiornato con successo!');
     } catch (error) {
       console.error('Update speech error:', error);
       alert('Errore nell\'aggiornamento dell\'intervento');
@@ -160,7 +158,6 @@ export default function SpeechManager({ eventId, sessions, speeches: initialSpee
       }
 
       setSpeeches(speeches.filter((s) => s.id !== speech.id));
-      alert('Intervento eliminato con successo!');
     } catch (error) {
       console.error('Delete speech error:', error);
       alert('Errore nell\'eliminazione dell\'intervento');

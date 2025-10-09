@@ -1,5 +1,7 @@
 'use client';
 
+import { TrendingUp, TrendingDown } from 'lucide-react';
+
 interface MetricCardProps {
   title: string;
   value: string | number;
@@ -12,28 +14,24 @@ export default function MetricCard({ title, value, trend, icon }: MetricCardProp
     if (!trend || trend === 'neutral') return null;
 
     return trend === 'up' ? (
-      <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
-      </svg>
+      <TrendingUp className="w-4 h-4 text-green-500" />
     ) : (
-      <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-      </svg>
+      <TrendingDown className="w-4 h-4 text-red-500" />
     );
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
+    <div className="bg-white rounded-lg shadow-card p-6 hover:shadow-lg transition-shadow">
       <div className="flex items-center justify-between">
         <div className="flex-1">
-          <p className="text-sm font-medium text-gray-600 mb-1">{title}</p>
+          <p className="text-sm font-medium text-brandInk/70 mb-1">{title}</p>
           <div className="flex items-center gap-2">
-            <p className="text-3xl font-bold text-gray-900">{value}</p>
+            <p className="text-3xl font-bold text-brandBlack">{value}</p>
             {getTrendIcon()}
           </div>
         </div>
         {icon && (
-          <div className="ml-4 text-blue-500 opacity-80">
+          <div className="ml-4 text-primary opacity-80">
             {icon}
           </div>
         )}

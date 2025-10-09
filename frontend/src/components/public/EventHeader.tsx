@@ -5,6 +5,8 @@
 interface EventHeaderProps {
   event: {
     name: string;
+    title: string;
+    organizer?: string;
     date: string;
     status: 'upcoming' | 'past' | 'archived';
     description: string | null;
@@ -37,8 +39,13 @@ export default function EventHeader({ event }: EventHeaderProps) {
       <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
         <div className="flex-1">
           <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">
-            {event.name}
+            {event.title}
           </h1>
+          {event.organizer && (
+            <p className="text-md text-gray-700 mb-1">
+              <span className="font-medium">Organizzatore:</span> {event.organizer}
+            </p>
+          )}
           <p className="text-lg text-gray-600">{formattedDate}</p>
         </div>
 

@@ -41,14 +41,14 @@ export default async function EventDashboardPage({ params }: PageProps) {
           <div className="mb-6">
             <a
               href="/admin/events"
-              className="text-blue-600 hover:text-blue-800 flex items-center gap-2"
+              className="text-primary hover:text-primary/90 flex items-center gap-2"
             >
               ← Torna a Gestione Eventi
             </a>
           </div>
 
           {/* Page Title */}
-          <h1 className="text-3xl font-bold text-gray-900 mb-8">Dashboard Evento</h1>
+          <h1 className="text-3xl font-bold text-brandBlack mb-8">Dashboard Evento</h1>
 
           {/* Dashboard Sections */}
           <div className="space-y-6">
@@ -68,11 +68,11 @@ export default async function EventDashboardPage({ params }: PageProps) {
             {/* Sessions & Speeches Summary */}
             <div className="bg-white shadow rounded-lg p-6">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold text-gray-900">Sessioni e Interventi</h2>
+                <h2 className="text-xl font-bold text-brandBlack">Sessioni e Interventi</h2>
                 <div className="flex gap-2">
                   <a
                     href={`/admin/events/${dashboardData.event.id}/sessions`}
-                    className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition flex items-center gap-2"
+                    className="px-4 py-2 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary/90 transition flex items-center gap-2"
                   >
                     <span>+</span>
                     <span>Sessione</span>
@@ -87,7 +87,7 @@ export default async function EventDashboardPage({ params }: PageProps) {
                 </div>
               </div>
               {dashboardData.sessions.length === 0 ? (
-                <p className="text-gray-500 text-center py-8">Nessuna sessione programmata</p>
+                <p className="text-brandInk/70 text-center py-8">Nessuna sessione programmata</p>
               ) : (
                 <div className="space-y-4">
                   {dashboardData.sessions.map((session) => {
@@ -97,11 +97,11 @@ export default async function EventDashboardPage({ params }: PageProps) {
                     return (
                       <div key={session.id} className="border rounded-lg overflow-hidden">
                         {/* Session Header */}
-                        <div className="bg-blue-50 p-4">
+                        <div className="bg-primary/10 p-4">
                           <div className="flex items-start justify-between">
                             <div className="flex-1">
-                              <h3 className="font-semibold text-gray-900 text-lg">{session.title}</h3>
-                              <div className="flex flex-wrap gap-3 mt-2 text-sm text-gray-600">
+                              <h3 className="font-semibold text-brandBlack text-lg">{session.title}</h3>
+                              <div className="flex flex-wrap gap-3 mt-2 text-sm text-brandInk/70">
                                 <span>🕐 {new Date(session.start_time).toLocaleDateString('it-IT')} {new Date(session.start_time).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}</span>
                                 {session.end_time && (
                                   <span>→ {new Date(session.end_time).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}</span>
@@ -111,7 +111,7 @@ export default async function EventDashboardPage({ params }: PageProps) {
                             </div>
                             <a
                               href={`/admin/events/${dashboardData.event.id}/sessions?edit=${session.id}`}
-                              className="ml-4 px-3 py-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-100 rounded transition"
+                              className="ml-4 px-3 py-1.5 text-sm font-medium text-primary hover:text-primary/90 hover:bg-primary/10 rounded transition"
                             >
                               Modifica
                             </a>
@@ -121,16 +121,16 @@ export default async function EventDashboardPage({ params }: PageProps) {
                         {sessionSpeeches.length > 0 ? (
                           <div className="divide-y">
                             {sessionSpeeches.map((speech) => (
-                              <div key={speech.id} className="p-4 hover:bg-gray-50 flex items-start justify-between">
+                              <div key={speech.id} className="p-4 hover:bg-primary/10 flex items-start justify-between">
                                 <div className="flex-1">
-                                  <h4 className="font-medium text-gray-900">{speech.title}</h4>
+                                  <h4 className="font-medium text-brandBlack">{speech.title}</h4>
                                   {speech.speaker_name && (
-                                    <p className="text-sm text-gray-600 mt-1">👤 {speech.speaker_name}</p>
+                                    <p className="text-sm text-brandInk/70 mt-1">👤 {speech.speaker_name}</p>
                                   )}
                                   {speech.duration && (
-                                    <p className="text-sm text-gray-600 mt-1">⏱️ {speech.duration} min</p>
+                                    <p className="text-sm text-brandInk/70 mt-1">⏱️ {speech.duration} min</p>
                                   )}
-                                  <p className="text-xs text-gray-500 mt-1">
+                                  <p className="text-xs text-brandInk/70 mt-1">
                                     📄 {speech.slide_count} slide
                                   </p>
                                 </div>
@@ -152,7 +152,7 @@ export default async function EventDashboardPage({ params }: PageProps) {
                             ))}
                           </div>
                         ) : (
-                          <div className="p-4 text-sm text-gray-500 italic">
+                          <div className="p-4 text-sm text-brandInk/70 italic">
                             Nessun intervento in questa sessione
                           </div>
                         )}
@@ -165,9 +165,9 @@ export default async function EventDashboardPage({ params }: PageProps) {
 
             {/* Event Photos Summary */}
             <div className="bg-white shadow rounded-lg p-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">Galleria Foto</h2>
+              <h2 className="text-xl font-bold text-brandBlack mb-4">Galleria Foto</h2>
               {dashboardData.photos.length === 0 ? (
-                <p className="text-gray-500 text-center py-8">Nessuna foto caricata</p>
+                <p className="text-brandInk/70 text-center py-8">Nessuna foto caricata</p>
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
                   {dashboardData.photos.map((photo) => (
@@ -184,7 +184,7 @@ export default async function EventDashboardPage({ params }: PageProps) {
                   ))}
                 </div>
               )}
-              <p className="text-sm text-gray-500 mt-4 text-center">
+              <p className="text-sm text-brandInk/70 mt-4 text-center">
                 Totale: {dashboardData.photos.length} foto
               </p>
             </div>
@@ -200,12 +200,12 @@ export default async function EventDashboardPage({ params }: PageProps) {
         <div className="min-h-screen bg-gray-50 flex items-center justify-center">
           <div className="bg-white shadow rounded-lg p-8 max-w-md">
             <h1 className="text-2xl font-bold text-red-600 mb-4">Accesso Negato</h1>
-            <p className="text-gray-700 mb-4">
+            <p className="text-brandInk mb-4">
               Non hai i permessi per accedere a questo evento.
             </p>
             <a
               href="/admin/events"
-              className="block text-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              className="block text-center px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90"
             >
               Torna a Gestione Eventi
             </a>
@@ -218,13 +218,13 @@ export default async function EventDashboardPage({ params }: PageProps) {
       return (
         <div className="min-h-screen bg-gray-50 flex items-center justify-center">
           <div className="bg-white shadow rounded-lg p-8 max-w-md">
-            <h1 className="text-2xl font-bold text-gray-900 mb-4">Evento Non Trovato</h1>
-            <p className="text-gray-700 mb-4">
+            <h1 className="text-2xl font-bold text-brandBlack mb-4">Evento Non Trovato</h1>
+            <p className="text-brandInk mb-4">
               L'evento che stai cercando non esiste o è stato eliminato.
             </p>
             <a
               href="/admin/events"
-              className="block text-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              className="block text-center px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90"
             >
               Torna a Gestione Eventi
             </a>
@@ -238,13 +238,13 @@ export default async function EventDashboardPage({ params }: PageProps) {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="bg-white shadow rounded-lg p-8 max-w-md">
           <h1 className="text-2xl font-bold text-red-600 mb-4">Errore</h1>
-          <p className="text-gray-700 mb-4">
+          <p className="text-brandInk mb-4">
             Si è verificato un errore nel caricamento della dashboard.
           </p>
-          <p className="text-sm text-gray-500 mb-4">{error.message}</p>
+          <p className="text-sm text-brandInk/70 mb-4">{error.message}</p>
           <a
             href="/admin/events"
-            className="block text-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            className="block text-center px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90"
           >
             Torna a Gestione Eventi
           </a>

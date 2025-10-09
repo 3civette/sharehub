@@ -86,7 +86,6 @@ export default function SessionManager({ eventId, eventDate, sessions: initialSe
       const newSession = await response.json();
       setSessions([...sessions, newSession]);
       resetForm();
-      alert('Sessione creata con successo!');
     } catch (error) {
       console.error('Create session error:', error);
       alert('Errore nella creazione della sessione');
@@ -124,7 +123,6 @@ export default function SessionManager({ eventId, eventDate, sessions: initialSe
       const updatedSession = await response.json();
       setSessions(sessions.map((s) => (s.id === editingId ? updatedSession : s)));
       resetForm();
-      alert('Sessione aggiornata con successo!');
     } catch (error) {
       console.error('Update session error:', error);
       alert('Errore nell\'aggiornamento della sessione');
@@ -152,7 +150,6 @@ export default function SessionManager({ eventId, eventDate, sessions: initialSe
       }
 
       setSessions(sessions.filter((s) => s.id !== sessionId));
-      alert('Sessione eliminata con successo!');
     } catch (error) {
       console.error('Delete session error:', error);
       alert('Errore nell\'eliminazione della sessione');

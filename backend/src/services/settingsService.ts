@@ -18,7 +18,7 @@ const supabase = createClient(
 export async function getSettings(tenantId: string): Promise<TenantSettings> {
   const { data, error } = await supabase
     .from('tenants')
-    .select('id, hotel_name, contact_email, contact_phone')
+    .select('id, hotel_name')
     .eq('id', tenantId)
     .single();
 
@@ -37,8 +37,8 @@ export async function getSettings(tenantId: string): Promise<TenantSettings> {
   return {
     id: data.id,
     hotel_name: data.hotel_name || DEFAULT_HOTEL_NAME,
-    contact_email: data.contact_email,
-    contact_phone: data.contact_phone,
+    contact_email: null,
+    contact_phone: null,
     billing_info: billingInfo
   };
 }

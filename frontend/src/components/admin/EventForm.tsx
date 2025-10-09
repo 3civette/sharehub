@@ -10,6 +10,8 @@ interface Event {
   id: string;
   tenant_id: string;
   name: string;
+  title: string;
+  organizer?: string;
   date: string; // ISO date
   slug: string;
   description: string | null;
@@ -22,6 +24,8 @@ interface Event {
 
 interface EventCreateInput {
   name: string;
+  title: string;
+  organizer?: string;
   date: string;
   description?: string;
   visibility: 'public' | 'private';
@@ -29,6 +33,8 @@ interface EventCreateInput {
 
 interface EventUpdateInput {
   name?: string;
+  title?: string;
+  organizer?: string;
   date?: string;
   description?: string;
   visibility?: 'public' | 'private';
@@ -49,6 +55,8 @@ export default function EventForm({
 }: EventFormProps) {
   const [formData, setFormData] = useState({
     name: initialData?.name || '',
+    title: initialData?.title || '',
+    organizer: initialData?.organizer || '',
     date: initialData?.date || '',
     description: initialData?.description || '',
     visibility: (initialData?.visibility || 'public') as 'public' | 'private'
@@ -61,6 +69,8 @@ export default function EventForm({
     if (initialData) {
       setFormData({
         name: initialData.name,
+        title: initialData.title,
+        organizer: initialData.organizer || '',
         date: initialData.date,
         description: initialData.description || '',
         visibility: initialData.visibility
@@ -76,6 +86,21 @@ export default function EventForm({
         }
         if (value.length > 255) {
           return 'Event name must be 255 characters or less';
+        }
+        return null;
+
+      case 'title':
+        if (!value.trim()) {
+          return 'Titolo è richiesto';
+        }
+        if (value.length > 300) {
+          return 'Il titolo deve essere massimo 300 caratteri';
+        }
+        return null;
+
+      case 'organizer':
+        if (value && value.length > 200) {
+          return 'L\'organizzatore deve essere massimo 200 caratteri';
         }
         return null;
 
@@ -164,6 +189,8 @@ export default function EventForm({
     // Prepare data for submission
     const submitData: EventCreateInput | EventUpdateInput = {
       name: formData.name,
+      title: formData.title,
+      organizer: formData.organizer || undefined,
       date: formData.date,
       description: formData.description || undefined,
       visibility: formData.visibility
@@ -182,7 +209,7 @@ export default function EventForm({
       {/* Event Name */}
       <div>
         <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-          Event Name *
+          Event Name (slug) *
         </label>
         <input
           type="text"
@@ -197,11 +224,66 @@ export default function EventForm({
               ? 'border-red-500'
               : 'border-gray-300'
           } ${isReadOnly ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-          placeholder="Enter event name"
+          placeholder="Enter event slug"
           maxLength={255}
         />
         {errors.name && touched.name && (
           <p className="mt-1 text-sm text-red-600">{errors.name}</p>
+        )}
+        <p className="mt-1 text-xs text-gray-500">
+          Usato per l'URL (es: /events/meeting-2025)
+        </p>
+      </div>
+
+      {/* Title */}
+      <div>
+        <label htmlFor="title" className="block text-sm font-medium text-gray-700">
+          Titolo *
+        </label>
+        <input
+          type="text"
+          id="title"
+          name="title"
+          value={formData.title}
+          onChange={handleChange}
+          onBlur={handleBlur}
+          disabled={isReadOnly}
+          className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+            errors.title && touched.title
+              ? 'border-red-500'
+              : 'border-gray-300'
+          } ${isReadOnly ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+          placeholder="Inserisci il titolo dell'evento"
+          maxLength={300}
+        />
+        {errors.title && touched.title && (
+          <p className="mt-1 text-sm text-red-600">{errors.title}</p>
+        )}
+      </div>
+
+      {/* Organizer */}
+      <div>
+        <label htmlFor="organizer" className="block text-sm font-medium text-gray-700">
+          Organizzatore
+        </label>
+        <input
+          type="text"
+          id="organizer"
+          name="organizer"
+          value={formData.organizer}
+          onChange={handleChange}
+          onBlur={handleBlur}
+          disabled={isReadOnly}
+          className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+            errors.organizer && touched.organizer
+              ? 'border-red-500'
+              : 'border-gray-300'
+          } ${isReadOnly ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+          placeholder="Nome dell'organizzatore (opzionale)"
+          maxLength={200}
+        />
+        {errors.organizer && touched.organizer && (
+          <p className="mt-1 text-sm text-red-600">{errors.organizer}</p>
         )}
       </div>
 

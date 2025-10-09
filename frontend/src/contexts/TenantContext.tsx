@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { api } from '@/lib/api';
+import { defaultBrandingColors } from '@/lib/designTokens';
 
 interface Branding {
   id: string;
@@ -52,13 +53,21 @@ export function TenantProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const applyBrandingToDOM = (brandingData: Branding) => {
+  const applyBrandingToDOM = (brandingData: Branding | null) => {
     const root = document.documentElement;
-    if (brandingData.primary_color) {
-      root.style.setProperty('--color-primary', brandingData.primary_color);
-    }
-    if (brandingData.secondary_color) {
-      root.style.setProperty('--color-secondary', brandingData.secondary_color);
+
+    if (brandingData) {
+      // Apply tenant custom branding
+      if (brandingData.primary_color) {
+        root.style.setProperty('--color-primary', brandingData.primary_color);
+      }
+      if (brandingData.secondary_color) {
+        root.style.setProperty('--color-secondary', brandingData.secondary_color);
+      }
+    } else {
+      // Apply 3Civette default colors when no custom branding exists
+      root.style.setProperty('--color-primary', defaultBrandingColors.primary);
+      root.style.setProperty('--color-secondary', defaultBrandingColors.secondary);
     }
   };
 
@@ -92,10 +101,14 @@ export function TenantProvider({ children }: { children: ReactNode }) {
           const brandingData = await brandingResponse.json();
           setBranding(brandingData);
           applyBrandingToDOM(brandingData);
+        } else {
+          // No custom branding, apply defaults
+          applyBrandingToDOM(null);
         }
       } catch (brandingErr) {
         console.error('Failed to fetch branding:', brandingErr);
-        // Continue without branding if it fails
+        // Apply defaults if branding fetch fails
+        applyBrandingToDOM(null);
       }
     } catch (err: any) {
       console.error('Failed to fetch tenant:', err);

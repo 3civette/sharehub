@@ -1,0 +1,381 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Branding Color Validation API",
+    "version": "1.0.0",
+    "description": "API contract for validating tenant branding colors against WCAG AA accessibility requirements"
+  },
+  "paths": {
+    "/api/admin/branding/validate-colors": {
+      "post": {
+        "summary": "Validate tenant branding colors for accessibility compliance",
+        "description": "Calculates contrast ratios and returns warnings if colors fail WCAG AA requirements. Always returns 200 with validation results in body.",
+        "tags": ["Branding", "Validation"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ColorValidationRequest"
+              },
+              "examples": {
+                "valid_colors": {
+                  "summary": "Valid 3Civette colors",
+                  "value": {
+                    "primary": "#D4AF37",
+                    "secondary": "#0B0B0C",
+                    "background": "#FFFFFF"
+                  }
+                },
+                "invalid_primary": {
+                  "summary": "Primary fails AA contrast",
+                  "value": {
+                    "primary": "#FFFF00",
+                    "secondary": "#0B0B0C",
+                    "background": "#FFFFFF"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Validation completed successfully (may contain warnings)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ColorValidationResponse"
+                },
+                "examples": {
+                  "all_pass": {
+                    "summary": "All colors pass WCAG AA",
+                    "value": {
+                      "valid": true,
+                      "warnings": [],
+                      "contrastRatios": {
+                        "primary": 4.8,
+                        "secondary": 18.5
+                      }
+                    }
+                  },
+                  "primary_fails": {
+                    "summary": "Primary color fails",
+                    "value": {
+                      "valid": false,
+                      "warnings": [
+                        "Primary color (#FFFF00) fails WCAG AA contrast (2.8:1, needs 4.5:1 for normal text)"
+                      ],
+                      "contrastRatios": {
+                        "primary": 2.8,
+                        "secondary": 18.5
+                      },
+                      "recommendations": {
+                        "primary": "#D4AF37"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request (malformed hex colors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": "Invalid color format",
+                  "message": "Primary color must be in hex format (#RRGGBB)"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - no valid auth token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": "Unauthorized",
+                  "message": "Valid authentication token required"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/branding": {
+      "put": {
+        "summary": "Update tenant branding (UPDATED CONTRACT)",
+        "description": "Updates tenant branding colors and logo. Now includes validation results and acknowledgement field.",
+        "tags": ["Branding"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BrandingUpdateRequest"
+              },
+              "examples": {
+                "acknowledge_warnings": {
+                  "summary": "Update with warning acknowledgement",
+                  "value": {
+                    "primary_color": "#FFFF00",
+                    "secondary_color": "#0B0B0C",
+                    "logo_url": "https://example.com/logo.png",
+                    "acknowledge_warnings": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Branding updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BrandingUpdateResponse"
+                },
+                "example": {
+                  "success": true,
+                  "branding": {
+                    "id": "123e4567-e89b-12d3-a456-426614174000",
+                    "tenant_id": "tenant-uuid",
+                    "primary_color": "#FFFF00",
+                    "secondary_color": "#0B0B0C",
+                    "logo_url": "https://example.com/logo.png",
+                    "updated_at": "2025-10-08T10:30:00Z"
+                  },
+                  "validation": {
+                    "warnings": [
+                      "Primary color fails WCAG AA contrast"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Supabase JWT token"
+      }
+    },
+    "schemas": {
+      "ColorValidationRequest": {
+        "type": "object",
+        "required": ["primary", "secondary", "background"],
+        "properties": {
+          "primary": {
+            "type": "string",
+            "pattern": "^#[0-9A-Fa-f]{6}$",
+            "description": "Primary brand color in hex format",
+            "example": "#D4AF37"
+          },
+          "secondary": {
+            "type": "string",
+            "pattern": "^#[0-9A-Fa-f]{6}$",
+            "description": "Secondary brand color in hex format",
+            "example": "#0B0B0C"
+          },
+          "background": {
+            "type": "string",
+            "pattern": "^#[0-9A-Fa-f]{6}$",
+            "description": "Background color (typically white)",
+            "example": "#FFFFFF"
+          }
+        }
+      },
+      "ColorValidationResponse": {
+        "type": "object",
+        "required": ["valid", "warnings", "contrastRatios"],
+        "properties": {
+          "valid": {
+            "type": "boolean",
+            "description": "True if all colors pass WCAG AA, false otherwise"
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Human-readable warning messages (empty if valid)"
+          },
+          "contrastRatios": {
+            "type": "object",
+            "required": ["primary", "secondary"],
+            "properties": {
+              "primary": {
+                "type": "number",
+                "minimum": 1.0,
+                "maximum": 21.0,
+                "description": "Contrast ratio for primary color vs background"
+              },
+              "secondary": {
+                "type": "number",
+                "minimum": 1.0,
+                "maximum": 21.0,
+                "description": "Contrast ratio for secondary color vs background"
+              }
+            }
+          },
+          "recommendations": {
+            "type": "object",
+            "description": "Suggested alternative colors (only present if warnings exist)",
+            "properties": {
+              "primary": {
+                "type": "string",
+                "pattern": "^#[0-9A-Fa-f]{6}$",
+                "description": "Recommended primary color"
+              },
+              "secondary": {
+                "type": "string",
+                "pattern": "^#[0-9A-Fa-f]{6}$",
+                "description": "Recommended secondary color"
+              }
+            }
+          }
+        }
+      },
+      "BrandingUpdateRequest": {
+        "type": "object",
+        "required": ["primary_color", "secondary_color"],
+        "properties": {
+          "primary_color": {
+            "type": "string",
+            "pattern": "^#[0-9A-Fa-f]{6}$",
+            "description": "Primary brand color"
+          },
+          "secondary_color": {
+            "type": "string",
+            "pattern": "^#[0-9A-Fa-f]{6}$",
+            "description": "Secondary brand color"
+          },
+          "logo_url": {
+            "type": "string",
+            "format": "uri",
+            "nullable": true,
+            "description": "URL to logo image (Supabase Storage)"
+          },
+          "acknowledge_warnings": {
+            "type": "boolean",
+            "default": false,
+            "description": "True if admin acknowledges accessibility warnings"
+          }
+        }
+      },
+      "BrandingUpdateResponse": {
+        "type": "object",
+        "required": ["success", "branding"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "branding": {
+            "type": "object",
+            "required": ["id", "tenant_id", "primary_color", "secondary_color", "updated_at"],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "tenant_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "primary_color": {
+                "type": "string",
+                "pattern": "^#[0-9A-Fa-f]{6}$"
+              },
+              "secondary_color": {
+                "type": "string",
+                "pattern": "^#[0-9A-Fa-f]{6}$"
+              },
+              "logo_url": {
+                "type": "string",
+                "format": "uri",
+                "nullable": true
+              },
+              "updated_at": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          },
+          "validation": {
+            "type": "object",
+            "required": ["warnings"],
+            "properties": {
+              "warnings": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Accessibility warnings (empty if none)"
+              }
+            }
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "required": ["error", "message"],
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Error type/category"
+          },
+          "message": {
+            "type": "string",
+            "description": "Human-readable error message"
+          }
+        }
+      }
+    }
+  }
+}

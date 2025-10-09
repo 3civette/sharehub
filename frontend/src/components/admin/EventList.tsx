@@ -197,7 +197,8 @@ export default function EventList({ events, onEventClick }: EventListProps) {
               {sortedEvents.map((event) => (
                 <tr
                   key={event.id}
-                  className={`hover:bg-gray-50 transition-colors ${
+                  onClick={() => onEventClick(event.id)}
+                  className={`hover:bg-primary/5 transition-colors cursor-pointer ${
                     isPastEvent(event) ? 'opacity-60' : ''
                   }`}
                 >
@@ -276,19 +277,12 @@ export default function EventList({ events, onEventClick }: EventListProps) {
 
                   {/* Actions */}
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <div className="flex items-center justify-end gap-3">
-                      <a
-                        href={`/admin/events/${event.id}/dashboard`}
-                        className="text-purple-600 hover:text-purple-900 transition-colors"
-                        title="Apri dashboard evento"
-                      >
-                        Dashboard
-                      </a>
+                    <div className="flex items-center justify-end gap-3" onClick={(e) => e.stopPropagation()}>
                       <a
                         href={`/events/${event.slug}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-green-600 hover:text-green-900 transition-colors flex items-center gap-1"
+                        className="text-green-600 hover:text-green-900 active:scale-95 transition-all duration-200 flex items-center gap-1"
                         title="Apri pagina pubblica"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -296,12 +290,13 @@ export default function EventList({ events, onEventClick }: EventListProps) {
                         </svg>
                         Pubblica
                       </a>
-                      <button
-                        onClick={() => onEventClick(event.id)}
-                        className="text-blue-600 hover:text-blue-900 transition-colors"
+                      <a
+                        href={`/admin/events/${event.id}/edit`}
+                        className="text-blue-600 hover:text-blue-900 active:scale-95 transition-all duration-200"
+                        title={isPastEvent(event) ? 'Visualizza evento' : 'Modifica evento'}
                       >
-                        {isPastEvent(event) ? 'View' : 'Edit'}
-                      </button>
+                        {isPastEvent(event) ? 'Visualizza' : 'Modifica'}
+                      </a>
                     </div>
                   </td>
                 </tr>

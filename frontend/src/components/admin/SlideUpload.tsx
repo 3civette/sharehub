@@ -158,8 +158,6 @@ export default function SlideUpload({ eventId, speechId, accessToken }: SlideUpl
       // Reset file input
       const fileInput = document.getElementById('file-input') as HTMLInputElement;
       if (fileInput) fileInput.value = '';
-
-      alert('Slide caricata con successo!');
     } catch (error) {
       console.error('Upload error:', error);
       alert(`Errore nell'upload: ${error instanceof Error ? error.message : 'Errore sconosciuto'}`);
@@ -189,7 +187,6 @@ export default function SlideUpload({ eventId, speechId, accessToken }: SlideUpl
       }
 
       setSlides(slides.filter((s) => s.id !== slideId));
-      alert('Slide eliminata con successo!');
     } catch (error) {
       console.error('Delete error:', error);
       alert('Errore nell\'eliminazione della slide');

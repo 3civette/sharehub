@@ -60,7 +60,17 @@
       "mcp__playwright__browser_click",
       "mcp__playwright__browser_wait_for",
       "mcp__playwright__browser_snapshot",
-      "mcp__playwright__browser_tabs"
+      "mcp__playwright__browser_tabs",
+      "Bash(npx supabase db diff:*)",
+      "Bash(find:*)",
+      "Bash(while read file)",
+      "Bash(do sed -i 's/bg-gradient-to-br from-slate-50 to-blue-50/bg-gradient-to-br from-primary\\/5 via-white to-secondary\\/5/g' \"$file\")",
+      "Bash(done)",
+      "Bash(echo:*)",
+      "Bash(dir frontend/src/app/events/[slug])",
+      "mcp__supabase__list_projects",
+      "mcp__supabase__list_tables",
+      "mcp__supabase__search_docs"
     ],
     "deny": [],
     "ask": []

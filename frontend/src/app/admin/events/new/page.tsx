@@ -48,8 +48,8 @@ export default function NewEventPage() {
 
       console.log('Admin tenant ID:', adminData.tenant_id);
 
-      // Generate slug from event name
-      const slug = data.event_name
+      // Generate slug from event name (if name is slug-friendly, otherwise use it as is)
+      const slug = data.name
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-|-$/g, '');
@@ -58,8 +58,10 @@ export default function NewEventPage() {
       const eventData = {
         tenant_id: adminData.tenant_id,
         slug: slug,
-        name: data.event_name,
-        date: data.event_date,
+        name: data.name,
+        title: data.title,
+        organizer: data.organizer || null,
+        date: data.date,
         description: data.description || null,
         visibility: data.visibility,
         status: 'upcoming',
@@ -106,10 +108,10 @@ export default function NewEventPage() {
   // Show tokens screen after creating private event
   if (tokens) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+      <div className="min-h-screen bg-gradient-to-br from-primary/5 via-white to-secondary/5">
         <header className="bg-white shadow-sm">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            <h1 className="text-2xl font-bold text-gray-900">Evento Creato con Successo!</h1>
+            <h1 className="text-2xl font-bold text-brandBlack">Evento Creato con Successo!</h1>
           </div>
         </header>
 
@@ -132,16 +134,16 @@ export default function NewEventPage() {
                 </svg>
               </div>
               <div>
-                <h2 className="text-xl font-semibold text-gray-900">{createdEventName}</h2>
-                <p className="text-sm text-gray-600">Evento privato creato con successo</p>
+                <h2 className="text-xl font-semibold text-brandBlack">{createdEventName}</h2>
+                <p className="text-sm text-brandInk/70">Evento privato creato con successo</p>
               </div>
             </div>
 
             <div className="space-y-4">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="bg-primary/10 border border-primary rounded-lg p-4">
                 <div className="flex gap-3">
                   <svg
-                    className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5"
+                    className="w-5 h-5 text-primary flex-shrink-0 mt-0.5"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -154,10 +156,10 @@ export default function NewEventPage() {
                     />
                   </svg>
                   <div>
-                    <h3 className="text-sm font-medium text-blue-900 mb-1">
+                    <h3 className="text-sm font-medium text-brandBlack mb-1">
                       Salva questi token
                     </h3>
-                    <p className="text-sm text-blue-800">
+                    <p className="text-sm text-brandInk">
                       Questi token sono necessari per accedere all'evento privato.
                       Conservali in un luogo sicuro - non potranno essere recuperati successivamente.
                     </p>
@@ -187,7 +189,7 @@ export default function NewEventPage() {
             <div className="pt-4 border-t border-gray-200">
               <button
                 onClick={handleContinue}
-                className="w-full bg-blue-600 text-white px-6 py-3 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium transition-colors"
+                className="w-full bg-primary text-white px-6 py-3 rounded-md hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary font-medium transition-colors"
               >
                 Continua alla Lista Eventi
               </button>
@@ -200,14 +202,14 @@ export default function NewEventPage() {
 
   // Show event form
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-white to-secondary/5">
       <AdminHeader
         title="Crea Nuovo Evento"
         subtitle="Compila i dettagli per creare un nuovo evento"
         actions={
           <button
             onClick={() => router.push('/admin/events')}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            className="px-4 py-2 text-sm font-medium text-brandInk bg-white border border-gray-300 rounded-lg hover:bg-primary/10 transition-colors"
           >
             Annulla
           </button>

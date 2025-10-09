@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import Link from 'next/link';
+import { Plus, Lock, ExternalLink, Edit } from 'lucide-react';
 
 interface Event {
   id: string;
@@ -37,47 +38,59 @@ export default function UpcomingEvents() {
 
       if (!adminData) return;
 
-      // Get upcoming events (next 5)
+      // Get upcoming events (next 5) - optimized to avoid N+1 queries
       const { data: eventsData } = await supabase
         .from('events')
-        .select('id, name, date, slug, visibility, status')
+        .select(`
+          id,
+          name,
+          date,
+          slug,
+          visibility,
+          status,
+          sessions:sessions(count)
+        `)
         .eq('tenant_id', adminData.tenant_id)
         .in('status', ['draft', 'upcoming', 'ongoing'])
         .order('date', { ascending: true })
         .limit(5);
 
-      // Fetch counts for each event
-      const eventsWithCounts = await Promise.all(
-        (eventsData || []).map(async (event) => {
-          // Get sessions count
-          const { count: sessionsCount } = await supabase
-            .from('sessions')
-            .select('*', { count: 'exact', head: true })
-            .eq('event_id', event.id);
+      // Fetch all speeches counts in a single query
+      const eventIds = (eventsData || []).map(e => e.id);
+      let speechesCountByEvent: Record<string, number> = {};
 
-          // Get speeches count
-          const { data: sessions } = await supabase
-            .from('sessions')
-            .select('id')
-            .eq('event_id', event.id);
+      if (eventIds.length > 0) {
+        const { data: sessionsData } = await supabase
+          .from('sessions')
+          .select('id, event_id')
+          .in('event_id', eventIds);
 
-          const sessionIds = (sessions || []).map(s => s.id);
-          let speechesCount = 0;
-          if (sessionIds.length > 0) {
-            const { count } = await supabase
-              .from('speeches')
-              .select('*', { count: 'exact', head: true })
-              .in('session_id', sessionIds);
-            speechesCount = count || 0;
-          }
+        if (sessionsData && sessionsData.length > 0) {
+          const sessionIds = sessionsData.map(s => s.id);
+          const { data: speechesData } = await supabase
+            .from('speeches')
+            .select('id, session_id, sessions!inner(event_id)')
+            .in('session_id', sessionIds);
 
-          return {
-            ...event,
-            sessions_count: sessionsCount || 0,
-            speeches_count: speechesCount,
-          };
-        })
-      );
+          // Count speeches per event
+          (speechesData || []).forEach((speech: any) => {
+            const eventId = speech.sessions.event_id;
+            speechesCountByEvent[eventId] = (speechesCountByEvent[eventId] || 0) + 1;
+          });
+        }
+      }
+
+      // Map counts to events
+      const eventsWithCounts = (eventsData || []).map(event => ({
+        id: event.id,
+        name: event.name,
+        date: event.date,
+        slug: event.slug,
+        visibility: event.visibility,
+        status: event.status,
+        sessions_count: event.sessions?.[0]?.count || 0,
+        speeches_count: speechesCountByEvent[event.id] || 0,
+      }));
 
       setEvents(eventsWithCounts);
     } catch (error) {
@@ -98,10 +111,10 @@ export default function UpcomingEvents() {
 
   const getStatusBadge = (status: Event['status']) => {
     const badges = {
-      draft: 'bg-gray-100 text-gray-700',
-      upcoming: 'bg-blue-100 text-blue-700',
+      draft: 'bg-brandSilver text-brandInk',
+      upcoming: 'bg-primary/10 text-primary',
       ongoing: 'bg-green-100 text-green-700',
-      past: 'bg-gray-100 text-gray-500',
+      past: 'bg-brandSilver text-brandInk/50',
     };
     const labels = {
       draft: 'Bozza',
@@ -118,10 +131,10 @@ export default function UpcomingEvents() {
 
   if (loading) {
     return (
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Prossimi Eventi</h3>
+      <div className="bg-white rounded-lg shadow-card p-6">
+        <h3 className="text-lg font-semibold text-brandBlack mb-4">Prossimi Eventi</h3>
         <div className="flex items-center justify-center py-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
         </div>
       </div>
     );
@@ -129,24 +142,22 @@ export default function UpcomingEvents() {
 
   if (events.length === 0) {
     return (
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Prossimi Eventi</h3>
-        <p className="text-gray-500 text-center py-8">Nessun evento programmato</p>
+      <div className="bg-white rounded-lg shadow-card p-6">
+        <h3 className="text-lg font-semibold text-brandBlack mb-4">Prossimi Eventi</h3>
+        <p className="text-brandInk/50 text-center py-8">Nessun evento programmato</p>
       </div>
     );
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6">
+    <div className="bg-white rounded-lg shadow-card p-6">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-gray-900">Prossimi Eventi</h3>
+        <h3 className="text-lg font-semibold text-brandBlack">Prossimi Eventi</h3>
         <Link
           href="/admin/events/new"
-          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors flex items-center gap-2"
+          className="px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-primary/90 active:scale-95 transition-all duration-200 rounded-lg flex items-center gap-2 shadow-button"
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
+          <Plus className="w-4 h-4" />
           Nuovo Evento
         </Link>
       </div>
@@ -154,26 +165,21 @@ export default function UpcomingEvents() {
         {events.map((event) => (
           <div
             key={event.id}
-            className="flex items-center justify-between p-4 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-all"
+            onClick={() => window.location.href = `/admin/events/${event.id}/dashboard`}
+            className="flex items-center justify-between p-4 rounded-lg border border-brandSilver hover:border-primary hover:bg-primary/5 active:scale-[0.99] transition-all cursor-pointer"
           >
             <div className="flex-1">
               <div className="flex items-center gap-3 mb-1">
-                <h4 className="font-semibold text-gray-900">{event.name}</h4>
+                <h4 className="font-semibold text-brandBlack">{event.name}</h4>
                 {getStatusBadge(event.status)}
                 {event.visibility === 'private' && (
-                  <span className="text-gray-400">
-                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                      <path
-                        fillRule="evenodd"
-                        d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
+                  <span className="text-brandInk/40">
+                    <Lock className="w-4 h-4" />
                   </span>
                 )}
               </div>
-              <p className="text-sm text-gray-600">{formatDate(event.date)}</p>
-              <div className="flex gap-3 mt-1 text-xs text-gray-600">
+              <p className="text-sm text-brandInk/70">{formatDate(event.date)}</p>
+              <div className="flex gap-3 mt-1 text-xs text-brandInk/60">
                 <span className="flex items-center gap-1">
                   <span>📂</span>
                   {event.sessions_count || 0} {event.sessions_count === 1 ? 'sessione' : 'sessioni'}
@@ -184,24 +190,26 @@ export default function UpcomingEvents() {
                 </span>
               </div>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
               <Link
                 href={`/admin/events/${event.id}/dashboard`}
-                className="px-3 py-1.5 text-sm font-medium text-green-600 hover:text-green-700 hover:bg-green-100 rounded-lg transition-colors"
+                className="px-3 py-1.5 text-sm font-medium text-green-600 hover:text-green-700 hover:bg-green-100 active:scale-95 transition-all duration-200 rounded-lg"
               >
                 Dashboard
               </Link>
               <Link
                 href={`/events/${event.slug}`}
                 target="_blank"
-                className="px-3 py-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-100 rounded-lg transition-colors"
+                className="px-3 py-1.5 text-sm font-medium text-primary hover:text-primary/80 hover:bg-primary/10 active:scale-95 transition-all duration-200 rounded-lg flex items-center gap-1"
               >
                 Vedi
+                <ExternalLink className="w-3 h-3" />
               </Link>
               <Link
                 href={`/admin/events/${event.id}/edit`}
-                className="px-3 py-1.5 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                className="px-3 py-1.5 text-sm font-medium text-brandInk hover:text-brandBlack hover:bg-bgSoft active:scale-95 transition-all duration-200 rounded-lg flex items-center gap-1"
               >
+                <Edit className="w-3 h-3" />
                 Modifica
               </Link>
             </div>
