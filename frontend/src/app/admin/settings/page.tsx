@@ -193,7 +193,7 @@ export default function AdminSettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-white to-secondary/5">
+    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-white to-secondary/5 dark:from-[#0B0B0C] dark:via-[#111827] dark:to-[#0B0B0C]">
       <AdminHeader
         title="Impostazioni"
         subtitle="Gestisci le impostazioni del tuo account"
@@ -201,10 +201,10 @@ export default function AdminSettingsPage() {
 
       <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {success && (
-          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-md">
+          <div className="mb-6 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md">
             <div className="flex gap-3">
               <svg
-                className="w-5 h-5 text-green-600 flex-shrink-0"
+                className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -217,8 +217,8 @@ export default function AdminSettingsPage() {
                 />
               </svg>
               <div>
-                <h3 className="text-sm font-medium text-green-900">Successo</h3>
-                <p className="text-sm text-green-800 mt-1">
+                <h3 className="text-sm font-medium text-green-900 dark:text-green-100">Successo</h3>
+                <p className="text-sm text-green-800 dark:text-green-200 mt-1">
                   Le impostazioni sono state aggiornate con successo!
                 </p>
               </div>
@@ -227,10 +227,10 @@ export default function AdminSettingsPage() {
         )}
 
         {error && !success && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md">
+          <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
             <div className="flex gap-3">
               <svg
-                className="w-5 h-5 text-red-600 flex-shrink-0"
+                className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -243,14 +243,14 @@ export default function AdminSettingsPage() {
                 />
               </svg>
               <div>
-                <h3 className="text-sm font-medium text-red-900">Errore</h3>
-                <p className="text-sm text-red-800 mt-1">{error}</p>
+                <h3 className="text-sm font-medium text-red-900 dark:text-red-100">Errore</h3>
+                <p className="text-sm text-red-800 dark:text-red-200 mt-1">{error}</p>
               </div>
             </div>
           </div>
         )}
 
-        <div className="bg-white rounded-lg shadow-md p-6">
+        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-800">
           <SettingsForm
             initialData={settings}
             onSubmit={handleSubmit}

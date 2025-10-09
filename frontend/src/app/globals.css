@@ -13,14 +13,35 @@
   --color-brand-gold: #D4AF37;
   --color-brand-silver: #E5E7EB;
 
+  /* Light Mode Theme Variables */
+  --bg-primary: #FFFFFF;
+  --bg-secondary: #F8FAFC;
+  --text-primary: #111827;
+  --text-secondary: #6b7280;
+  --border-color: #E5E7EB;
+
   /* Fonts */
   --font-display: "Archivo Black", "Bebas Neue", system-ui, sans-serif;
   --font-sans: Inter, ui-sans-serif, system-ui, sans-serif;
 }
 
+:root.dark {
+  /* Dark Mode Theme Variables - Using 3Civette Palette */
+  --bg-primary: #0B0B0C; /* Brand Black */
+  --bg-secondary: #111827; /* Brand Ink */
+  --text-primary: #FFFFFF;
+  --text-secondary: #E5E7EB; /* Brand Silver */
+  --border-color: #374151; /* Darker gray for borders */
+
+  /* Keep gold as primary accent in dark mode */
+  --color-primary: #D4AF37; /* Gold stays vibrant */
+}
+
 @layer base {
   body {
-    @apply font-sans text-brand-ink;
+    @apply font-sans;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
     line-height: 1.6;
   }
 

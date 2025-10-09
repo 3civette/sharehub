@@ -4,6 +4,7 @@
 // Component: Event overview with metrics display
 
 import { Event } from '@/types/admin';
+import { Globe, Lock, Calendar, Eye, Download, Users } from 'lucide-react';
 
 interface MetricsSummary {
   pageViews: number;
@@ -25,10 +26,7 @@ export default function EventDashboardOverview({ event, metrics }: EventDashboar
     past: 'bg-gray-100 text-gray-600',
   };
 
-  const visibilityIcons = {
-    public: '🌐',
-    private: '🔒',
-  };
+  const VisibilityIcon = event.visibility === 'public' ? Globe : Lock;
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('it-IT', {
@@ -56,10 +54,11 @@ export default function EventDashboardOverview({ event, metrics }: EventDashboar
             <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusColors[event.status]}`}>
               {event.status}
             </span>
-            <span className="text-xl">{visibilityIcons[event.visibility]}</span>
+            <VisibilityIcon className="w-5 h-5 text-gray-600" />
           </div>
-          <p className="text-gray-600">
-            📅 {formatDate(event.date)}
+          <p className="text-gray-600 flex items-center gap-2">
+            <Calendar className="w-4 h-4" />
+            {formatDate(event.date)}
           </p>
           {event.description && (
             <p className="mt-3 text-gray-700">{event.description}</p>
@@ -92,7 +91,7 @@ export default function EventDashboardOverview({ event, metrics }: EventDashboar
               <p className="text-sm text-blue-600 font-medium">Visualizzazioni</p>
               <p className="text-3xl font-bold text-blue-900 mt-1">{metrics.pageViews}</p>
             </div>
-            <div className="text-4xl">👁️</div>
+            <Eye className="w-10 h-10 text-blue-600" />
           </div>
         </div>
 
@@ -102,7 +101,7 @@ export default function EventDashboardOverview({ event, metrics }: EventDashboar
               <p className="text-sm text-green-600 font-medium">Download Slide</p>
               <p className="text-3xl font-bold text-green-900 mt-1">{metrics.slideDownloads}</p>
             </div>
-            <div className="text-4xl">📥</div>
+            <Download className="w-10 h-10 text-green-600" />
           </div>
         </div>
 
@@ -112,7 +111,7 @@ export default function EventDashboardOverview({ event, metrics }: EventDashboar
               <p className="text-sm text-purple-600 font-medium">Partecipanti</p>
               <p className="text-3xl font-bold text-purple-900 mt-1">{metrics.participantCount}</p>
             </div>
-            <div className="text-4xl">👥</div>
+            <Users className="w-10 h-10 text-purple-600" />
           </div>
         </div>
       </div>

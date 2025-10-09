@@ -21,12 +21,12 @@ export default function MetricCard({ title, value, trend, icon }: MetricCardProp
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-card p-6 hover:shadow-lg transition-shadow">
+    <div className="bg-white dark:bg-[#111827] rounded-lg shadow-card p-6 hover:shadow-lg transition-shadow border border-transparent dark:border-[#374151]">
       <div className="flex items-center justify-between">
         <div className="flex-1">
-          <p className="text-sm font-medium text-brandInk/70 mb-1">{title}</p>
+          <p className="text-sm font-medium text-brandInk/70 dark:text-[#E5E7EB] mb-1">{title}</p>
           <div className="flex items-center gap-2">
-            <p className="text-3xl font-bold text-brandBlack">{value}</p>
+            <p className="text-3xl font-bold text-brandBlack dark:text-white">{value}</p>
             {getTrendIcon()}
           </div>
         </div>

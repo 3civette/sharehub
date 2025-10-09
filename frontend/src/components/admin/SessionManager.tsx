@@ -4,6 +4,7 @@
 // Manage sessions (CRUD operations) with date selection from event date
 
 import { useState } from 'react';
+import { Calendar, Clock, MapPin } from 'lucide-react';
 
 interface Session {
   id: string;
@@ -196,8 +197,9 @@ export default function SessionManager({ eventId, eventDate, sessions: initialSe
     <div className="space-y-6">
       {/* Event Date Info */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <p className="text-blue-900">
-          📅 <strong>Data dell'evento:</strong> {formatEventDate(eventDate)}
+        <p className="text-blue-900 flex items-center gap-2">
+          <Calendar className="w-5 h-5" />
+          <strong>Data dell'evento:</strong> {formatEventDate(eventDate)}
         </p>
         <p className="text-sm text-blue-700 mt-1">
           Le sessioni verranno create per questa data. Indica solo gli orari di inizio e fine.
@@ -334,11 +336,19 @@ export default function SessionManager({ eventId, eventDate, sessions: initialSe
                       <p className="text-sm text-gray-600 mt-1">{session.description}</p>
                     )}
                     <div className="flex flex-wrap gap-3 mt-2 text-sm text-gray-500">
-                      <span>🕐 {formatDateTime(session.start_time)}</span>
+                      <span className="flex items-center gap-1">
+                        <Clock className="w-4 h-4" />
+                        {formatDateTime(session.start_time)}
+                      </span>
                       {session.end_time && (
                         <span>→ {formatDateTime(session.end_time)}</span>
                       )}
-                      {session.room && <span>📍 {session.room}</span>}
+                      {session.room && (
+                        <span className="flex items-center gap-1">
+                          <MapPin className="w-4 h-4" />
+                          {session.room}
+                        </span>
+                      )}
                     </div>
                   </div>
 

@@ -78,31 +78,31 @@ export default function ActivityLog({ activities }: ActivityLogProps) {
 
   if (!activities || activities.length === 0) {
     return (
-      <div className="bg-white rounded-lg shadow-card p-6">
-        <h3 className="text-lg font-semibold text-brandBlack mb-4">Attività Recenti</h3>
-        <p className="text-brandInk/50 text-center py-8">Nessuna attività recente</p>
+      <div className="bg-white dark:bg-[#111827] rounded-lg shadow-card p-6 border border-transparent dark:border-[#374151]">
+        <h3 className="text-lg font-semibold text-brandBlack dark:text-white mb-4">Attività Recenti</h3>
+        <p className="text-brandInk/50 dark:text-[#E5E7EB]/50 text-center py-8">Nessuna attività recente</p>
       </div>
     );
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-card p-6">
-      <h3 className="text-lg font-semibold text-brandBlack mb-4">Attività Recenti</h3>
+    <div className="bg-white dark:bg-[#111827] rounded-lg shadow-card p-6 border border-transparent dark:border-[#374151]">
+      <h3 className="text-lg font-semibold text-brandBlack dark:text-white mb-4">Attività Recenti</h3>
       <div className="space-y-3">
         {activities.map((activity) => (
           <div
             key={activity.id}
-            className="flex items-start gap-3 p-3 rounded-lg hover:bg-bgSoft transition-colors"
+            className="flex items-start gap-3 p-3 rounded-lg hover:bg-bgSoft dark:hover:bg-[#0B0B0C] transition-colors"
           >
             <div className={`p-2 rounded-full ${getActorColor(activity.actor_type)}`}>
               {getActivityIcon(activity.actor_type)}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm text-brandBlack">
+              <p className="text-sm text-brandBlack dark:text-white">
                 <span className="font-medium capitalize">{activity.actor_type}</span>{' '}
                 {getActionDescription(activity)}
               </p>
-              <p className="text-xs text-brandInk/50 mt-1">
+              <p className="text-xs text-brandInk/50 dark:text-[#E5E7EB]/50 mt-1">
                 {formatTimestamp(activity.created_at)}
               </p>
             </div>

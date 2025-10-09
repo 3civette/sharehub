@@ -6,6 +6,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { FolderOpen, MessageSquare } from 'lucide-react';
 
 interface Event {
   id: string;
@@ -214,11 +215,11 @@ export default function EventList({ events, onEventClick }: EventListProps) {
                     )}
                     <div className="flex gap-3 mt-1 text-xs text-gray-600">
                       <span className="flex items-center gap-1">
-                        <span>📂</span>
+                        <FolderOpen className="w-3.5 h-3.5" />
                         {event.sessions_count || 0} {event.sessions_count === 1 ? 'sessione' : 'sessioni'}
                       </span>
                       <span className="flex items-center gap-1">
-                        <span>💬</span>
+                        <MessageSquare className="w-3.5 h-3.5" />
                         {event.speeches_count || 0} {event.speeches_count === 1 ? 'intervento' : 'interventi'}
                       </span>
                     </div>

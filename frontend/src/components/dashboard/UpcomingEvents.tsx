@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import Link from 'next/link';
-import { Plus, Lock, ExternalLink, Edit } from 'lucide-react';
+import { Plus, Lock, ExternalLink, Edit, FolderOpen, MessageSquare } from 'lucide-react';
 
 interface Event {
   id: string;
@@ -131,8 +131,8 @@ export default function UpcomingEvents() {
 
   if (loading) {
     return (
-      <div className="bg-white rounded-lg shadow-card p-6">
-        <h3 className="text-lg font-semibold text-brandBlack mb-4">Prossimi Eventi</h3>
+      <div className="bg-white dark:bg-[#111827] rounded-lg shadow-card p-6 border border-transparent dark:border-[#374151]">
+        <h3 className="text-lg font-semibold text-brandBlack dark:text-white mb-4">Prossimi Eventi</h3>
         <div className="flex items-center justify-center py-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
         </div>
@@ -142,17 +142,17 @@ export default function UpcomingEvents() {
 
   if (events.length === 0) {
     return (
-      <div className="bg-white rounded-lg shadow-card p-6">
-        <h3 className="text-lg font-semibold text-brandBlack mb-4">Prossimi Eventi</h3>
-        <p className="text-brandInk/50 text-center py-8">Nessun evento programmato</p>
+      <div className="bg-white dark:bg-[#111827] rounded-lg shadow-card p-6 border border-transparent dark:border-[#374151]">
+        <h3 className="text-lg font-semibold text-brandBlack dark:text-white mb-4">Prossimi Eventi</h3>
+        <p className="text-brandInk/50 dark:text-[#E5E7EB]/50 text-center py-8">Nessun evento programmato</p>
       </div>
     );
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-card p-6">
+    <div className="bg-white dark:bg-[#111827] rounded-lg shadow-card p-6 border border-transparent dark:border-[#374151]">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-brandBlack">Prossimi Eventi</h3>
+        <h3 className="text-lg font-semibold text-brandBlack dark:text-white">Prossimi Eventi</h3>
         <Link
           href="/admin/events/new"
           className="px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-primary/90 active:scale-95 transition-all duration-200 rounded-lg flex items-center gap-2 shadow-button"
@@ -166,26 +166,26 @@ export default function UpcomingEvents() {
           <div
             key={event.id}
             onClick={() => window.location.href = `/admin/events/${event.id}/dashboard`}
-            className="flex items-center justify-between p-4 rounded-lg border border-brandSilver hover:border-primary hover:bg-primary/5 active:scale-[0.99] transition-all cursor-pointer"
+            className="flex items-center justify-between p-4 rounded-lg border border-brandSilver dark:border-[#374151] hover:border-primary hover:bg-primary/5 dark:hover:bg-primary/10 active:scale-[0.99] transition-all cursor-pointer"
           >
             <div className="flex-1">
               <div className="flex items-center gap-3 mb-1">
-                <h4 className="font-semibold text-brandBlack">{event.name}</h4>
+                <h4 className="font-semibold text-brandBlack dark:text-white">{event.name}</h4>
                 {getStatusBadge(event.status)}
                 {event.visibility === 'private' && (
-                  <span className="text-brandInk/40">
+                  <span className="text-brandInk/40 dark:text-[#E5E7EB]/40">
                     <Lock className="w-4 h-4" />
                   </span>
                 )}
               </div>
-              <p className="text-sm text-brandInk/70">{formatDate(event.date)}</p>
-              <div className="flex gap-3 mt-1 text-xs text-brandInk/60">
+              <p className="text-sm text-brandInk/70 dark:text-[#E5E7EB]">{formatDate(event.date)}</p>
+              <div className="flex gap-3 mt-1 text-xs text-brandInk/60 dark:text-[#E5E7EB]/60">
                 <span className="flex items-center gap-1">
-                  <span>📂</span>
+                  <FolderOpen className="w-3.5 h-3.5" />
                   {event.sessions_count || 0} {event.sessions_count === 1 ? 'sessione' : 'sessioni'}
                 </span>
                 <span className="flex items-center gap-1">
-                  <span>💬</span>
+                  <MessageSquare className="w-3.5 h-3.5" />
                   {event.speeches_count || 0} {event.speeches_count === 1 ? 'intervento' : 'interventi'}
                 </span>
               </div>
@@ -193,21 +193,21 @@ export default function UpcomingEvents() {
             <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
               <Link
                 href={`/admin/events/${event.id}/dashboard`}
-                className="px-3 py-1.5 text-sm font-medium text-green-600 hover:text-green-700 hover:bg-green-100 active:scale-95 transition-all duration-200 rounded-lg"
+                className="px-3 py-1.5 text-sm font-medium text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 hover:bg-green-100 dark:hover:bg-green-900/20 active:scale-95 transition-all duration-200 rounded-lg"
               >
                 Dashboard
               </Link>
               <Link
                 href={`/events/${event.slug}`}
                 target="_blank"
-                className="px-3 py-1.5 text-sm font-medium text-primary hover:text-primary/80 hover:bg-primary/10 active:scale-95 transition-all duration-200 rounded-lg flex items-center gap-1"
+                className="px-3 py-1.5 text-sm font-medium text-primary hover:text-primary/80 hover:bg-primary/10 dark:hover:bg-primary/20 active:scale-95 transition-all duration-200 rounded-lg flex items-center gap-1"
               >
                 Vedi
                 <ExternalLink className="w-3 h-3" />
               </Link>
               <Link
                 href={`/admin/events/${event.id}/edit`}
-                className="px-3 py-1.5 text-sm font-medium text-brandInk hover:text-brandBlack hover:bg-bgSoft active:scale-95 transition-all duration-200 rounded-lg flex items-center gap-1"
+                className="px-3 py-1.5 text-sm font-medium text-brandInk dark:text-[#E5E7EB] hover:text-brandBlack dark:hover:text-white hover:bg-bgSoft dark:hover:bg-[#0B0B0C] active:scale-95 transition-all duration-200 rounded-lg flex items-center gap-1"
               >
                 <Edit className="w-3 h-3" />
                 Modifica

@@ -144,7 +144,7 @@ export default function DashboardPage() {
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-brandInk/70">Caricamento dashboard...</p>
+          <p className="text-brandInk/70 dark:text-[#E5E7EB]">Caricamento dashboard...</p>
         </div>
       </div>
     );
@@ -153,12 +153,12 @@ export default function DashboardPage() {
   if (error) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="bg-white rounded-lg shadow-card p-8 max-w-md">
-          <div className="text-red-500 mb-4">
+        <div className="bg-white dark:bg-[#111827] rounded-lg shadow-card p-8 max-w-md border border-transparent dark:border-[#374151]">
+          <div className="text-red-500 dark:text-red-400 mb-4">
             <AlertCircle className="w-12 h-12 mx-auto" />
           </div>
-          <h2 className="text-xl font-bold text-brandBlack text-center mb-2">Errore</h2>
-          <p className="text-brandInk/70 text-center mb-4">{error}</p>
+          <h2 className="text-xl font-bold text-brandBlack dark:text-white text-center mb-2">Errore</h2>
+          <p className="text-brandInk/70 dark:text-[#E5E7EB] text-center mb-4">{error}</p>
           <button
             onClick={() => router.push('/login')}
             className="w-full py-2 bg-primary text-white rounded-lg hover:bg-primary/90 active:scale-95 transition-all shadow-button"
@@ -173,16 +173,16 @@ export default function DashboardPage() {
   return (
     <>
       {/* Header */}
-      <header className="bg-white/80 backdrop-blur-sm shadow-sm border-b border-brandSilver/30">
+      <header className="bg-white/80 dark:bg-[#0B0B0C]/95 backdrop-blur-sm shadow-sm border-b border-brandSilver/30 dark:border-[#374151]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-brandBlack">Dashboard</h1>
-              <p className="text-sm text-brandInk/70 mt-1">Panoramica del tuo account Meeting Hub</p>
+              <h1 className="text-2xl font-bold text-brandBlack dark:text-white">Dashboard</h1>
+              <p className="text-sm text-brandInk/70 dark:text-[#E5E7EB] mt-1">Panoramica del tuo account Meeting Hub</p>
             </div>
             <button
               onClick={handleLogout}
-              className="px-4 py-2 text-sm font-medium text-brandInk bg-white border border-brandSilver rounded-lg hover:bg-bgSoft active:scale-95 transition-all"
+              className="px-4 py-2 text-sm font-medium text-brandInk dark:text-[#E5E7EB] bg-white dark:bg-[#111827] border border-brandSilver dark:border-[#374151] rounded-lg hover:bg-bgSoft dark:hover:bg-[#1F2937] active:scale-95 transition-all"
             >
               Esci
             </button>
