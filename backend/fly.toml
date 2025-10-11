@@ -27,7 +27,15 @@ primary_region = "ams" # Amsterdam - closest to Italy
     timeout = "5s"
     path = "/health"
 
+# Persistent volume for file storage
+# Holds: event files (7 days) + temporary ZIPs (1 day)
+# Max ~30 events/week × 500MB = 15GB
+[mounts]
+  source = "sharehub_storage"
+  destination = "/data"
+  initial_size = "15gb"
+
 [[vm]]
   cpu_kind = "shared"
   cpus = 1
-  memory_mb = 256
+  memory_mb = 1024  # 1GB RAM for ZIP generation of large files
