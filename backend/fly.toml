@@ -27,13 +27,13 @@ primary_region = "ams" # Amsterdam - closest to Italy
     timeout = "5s"
     path = "/health"
 
-# Persistent volume for file storage
-# Holds: event files (7 days) + temporary ZIPs (1 day)
-# Max ~30 events/week × 500MB = 15GB
+# Persistent volume for HOT storage only (7 days retention)
+# ZIPs are stored on Cloudflare R2 for long-term archiving
+# Max ~10 events × 500MB = 5GB (with buffer)
 [mounts]
   source = "sharehub_storage"
   destination = "/data"
-  initial_size = "15gb"
+  initial_size = "5gb"
 
 [[vm]]
   cpu_kind = "shared"
