@@ -1,0 +1,268 @@
+# API Contract: Generate Presigned Download URL
+
+**Endpoint**: `GET /api/slides/[id]/download`
+**Purpose**: Generate a presigned URL for downloading a slide from R2
+**Authentication**: Required (validates RLS access to event)
+
+## Request
+
+### URL Parameters
+```yaml
+id: string  # UUID of the slide
+```
+
+### Headers
+```yaml
+Authorization: Bearer {supabase_jwt_token}
+```
+
+### Query Parameters
+None
+
+---
+
+## Response: Success (200)
+
+```typescript
+{
+  download_url: string;    // Presigned R2 URL (valid 1 hour)
+  filename: string;        // Original filename
+  file_size: number;       // Size in bytes
+  mime_type: string;       // MIME type
+  expires_at: string;      // ISO timestamp when URL expires
+}
+```
+
+### Example
+```json
+{
+  "download_url": "https://abc123.r2.cloudflarestorage.com/sharehub-slides/tenant-550e8400-e29b-41d4-a716-446655440000/event-6ba7b810-9dad-11d1-80b4-00c04fd430c8/slide-f47ac10b-58cc-4372-a567-0e02b2c3d479.pdf?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=...",
+  "filename": "presentation.pdf",
+  "file_size": 2048576,
+  "mime_type": "application/pdf",
+  "expires_at": "2025-10-11T15:30:00Z"
+}
+```
+
+---
+
+## Response: Error (403 - Forbidden)
+
+```json
+{
+  "error": "ACCESS_DENIED",
+  "message": "You do not have permission to access this file"
+}
+```
+
+**Trigger**: User's tenant does not match slide's tenant (RLS violation)
+
+---
+
+## Response: Error (404 - Not Found)
+
+### Slide Not Found
+```json
+{
+  "error": "SLIDE_NOT_FOUND",
+  "message": "Slide not found or has been deleted"
+}
+```
+
+### File Expired (Deleted After 48h)
+```json
+{
+  "error": "FILE_EXPIRED",
+  "message": "File has been automatically deleted after 48-hour retention period"
+}
+```
+
+**Trigger**: `deleted_at IS NOT NULL` in database
+
+---
+
+## Response: Error (500 - Internal Server Error)
+
+```json
+{
+  "error": "R2_CONNECTION_FAILED",
+  "message": "Failed to generate download URL. Please try again."
+}
+```
+
+---
+
+## Implementation Notes
+
+### Server-Side Process
+1. **Authenticate**: Verify JWT token
+2. **Fetch slide metadata**:
+   ```sql
+   SELECT id, filename, file_size, mime_type, r2_key, deleted_at, tenant_id
+   FROM slides
+   WHERE id = $1 AND deleted_at IS NULL
+   ```
+3. **Validate access**: RLS policies automatically enforce tenant isolation
+4. **Check file status**:
+   - If `deleted_at IS NOT NULL` → 404 FILE_EXPIRED
+   - If `r2_key IS NULL` → fallback to legacy storage (out of scope)
+5. **Generate presigned download URL**: Using AWS SDK GetObjectCommand
+6. **Return response**: Include download_url, filename, file_size, mime_type, expires_at
+
+### Client-Side Process
+1. **Call API**: GET /api/slides/{id}/download with auth token
+2. **Receive presigned URL**: Extract `download_url` from response
+3. **Trigger download**:
+   ```typescript
+   // Option 1: Direct link (opens in new tab)
+   window.open(download_url, '_blank');
+
+   // Option 2: Download with custom filename
+   const response = await fetch(download_url);
+   const blob = await response.blob();
+   const link = document.createElement('a');
+   link.href = URL.createObjectURL(blob);
+   link.download = filename;
+   link.click();
+   ```
+
+### Security Considerations
+- Presigned URLs expire after 1 hour
+- RLS policies prevent cross-tenant access
+- Deleted files return 404 (no URL generated)
+- URL does not expose internal system paths
+
+### Performance Targets
+- Response time: <500ms (metadata lookup + URL generation)
+- Database query: <50ms
+- R2 presigned URL generation: <100ms
+
+---
+
+## Test Cases
+
+### Contract Test: Valid Download Request
+```typescript
+test('GET /api/slides/:id/download returns valid presigned URL', async () => {
+  // Create test slide first
+  const slide = await createTestSlide({
+    session_id: validSessionId,
+    filename: 'test.pdf',
+    r2_key: 'tenant-abc/event-xyz/slide-123.pdf',
+  });
+
+  const response = await request(app)
+    .get(`/api/slides/${slide.id}/download`)
+    .set('Authorization', `Bearer ${adminToken}`);
+
+  expect(response.status).toBe(200);
+  expect(response.body).toMatchObject({
+    download_url: expect.stringContaining('r2.cloudflarestorage.com'),
+    filename: 'test.pdf',
+    file_size: expect.any(Number),
+    mime_type: expect.any(String),
+    expires_at: expect.any(String),
+  });
+
+  // Verify URL is valid
+  const url = new URL(response.body.download_url);
+  expect(url.searchParams.has('X-Amz-Algorithm')).toBe(true);
+  expect(url.searchParams.has('X-Amz-Signature')).toBe(true);
+});
+```
+
+### Contract Test: Deleted File
+```typescript
+test('GET /api/slides/:id/download returns 404 for deleted files', async () => {
+  const slide = await createTestSlide({
+    session_id: validSessionId,
+    filename: 'deleted.pdf',
+    deleted_at: new Date(),
+  });
+
+  const response = await request(app)
+    .get(`/api/slides/${slide.id}/download`)
+    .set('Authorization', `Bearer ${adminToken}`);
+
+  expect(response.status).toBe(404);
+  expect(response.body.error).toBe('FILE_EXPIRED');
+});
+```
+
+### Contract Test: Cross-Tenant Access Denied
+```typescript
+test('GET /api/slides/:id/download denies cross-tenant access', async () => {
+  // Slide belongs to tenant A
+  const slide = await createTestSlide({
+    tenant_id: tenantAId,
+    session_id: validSessionId,
+    filename: 'secret.pdf',
+  });
+
+  // User from tenant B tries to access
+  const response = await request(app)
+    .get(`/api/slides/${slide.id}/download`)
+    .set('Authorization', `Bearer ${tenantBAdminToken}`);
+
+  expect(response.status).toBe(403);
+  expect(response.body.error).toBe('ACCESS_DENIED');
+});
+```
+
+### Contract Test: Non-Existent Slide
+```typescript
+test('GET /api/slides/:id/download returns 404 for non-existent slide', async () => {
+  const fakeId = '00000000-0000-0000-0000-000000000000';
+
+  const response = await request(app)
+    .get(`/api/slides/${fakeId}/download`)
+    .set('Authorization', `Bearer ${adminToken}`);
+
+  expect(response.status).toBe(404);
+  expect(response.body.error).toBe('SLIDE_NOT_FOUND');
+});
+```
+
+---
+
+## Integration with Frontend
+
+### Usage in SlideDownload Component
+```typescript
+// frontend/src/components/public/SlideDownload.tsx
+
+async function handleDownload(slideId: string) {
+  try {
+    const response = await fetch(`/api/slides/${slideId}/download`, {
+      headers: {
+        Authorization: `Bearer ${supabaseToken}`,
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      if (error.error === 'FILE_EXPIRED') {
+        showNotification('This file has been automatically deleted after 48 hours');
+      } else {
+        showNotification('Download failed. Please try again.');
+      }
+      return;
+    }
+
+    const { download_url, filename } = await response.json();
+
+    // Trigger download
+    window.open(download_url, '_blank');
+  } catch (error) {
+    console.error('Download error:', error);
+    showNotification('Download failed. Please try again.');
+  }
+}
+```
+
+---
+
+**Related Contracts**:
+- [presigned-upload.yml](./presigned-upload.yml) - Upload presigned URLs
+- [slide-metadata.yml](./slide-metadata.yml) - Slide metadata retrieval
+- [cleanup-scheduled.yml](./cleanup-scheduled.yml) - Automatic file deletion

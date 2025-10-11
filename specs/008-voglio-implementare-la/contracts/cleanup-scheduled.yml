@@ -1,0 +1,360 @@
+# API Contract: Scheduled Cleanup Function
+
+**Endpoint**: `POST /api/cleanup`
+**Purpose**: Automatically delete slides older than 48 hours from R2 and mark as deleted
+**Trigger**: Netlify Scheduled Function (cron: every 6 hours)
+**Authentication**: Internal (no external auth required)
+
+## Request
+
+### Headers
+```yaml
+x-netlify-event: schedule  # Netlify-specific header (internal trigger)
+```
+
+### Body
+None (triggered by scheduler, no payload)
+
+---
+
+## Response: Success (200)
+
+```typescript
+{
+  deleted_count: number;         // Number of slides successfully deleted
+  processed_count: number;       // Total slides processed
+  errors: Array<{
+    slide_id: string;
+    r2_key: string;
+    error: string;
+  }>;
+  execution_time_ms: number;     // Time taken for cleanup
+  next_run: string;              // ISO timestamp of next scheduled run
+}
+```
+
+### Example: Successful Cleanup
+```json
+{
+  "deleted_count": 12,
+  "processed_count": 12,
+  "errors": [],
+  "execution_time_ms": 2340,
+  "next_run": "2025-10-11T21:00:00Z"
+}
+```
+
+### Example: Partial Success (with errors)
+```json
+{
+  "deleted_count": 10,
+  "processed_count": 12,
+  "errors": [
+    {
+      "slide_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+      "r2_key": "tenant-abc/event-xyz/slide-123.pdf",
+      "error": "R2 delete failed: NoSuchKey"
+    },
+    {
+      "slide_id": "a32bc10b-58cc-4372-a567-0e02b2c3d123",
+      "r2_key": "tenant-def/event-uvw/slide-456.pdf",
+      "error": "R2 delete failed: Network timeout"
+    }
+  ],
+  "execution_time_ms": 5670,
+  "next_run": "2025-10-11T21:00:00Z"
+}
+```
+
+---
+
+## Response: Error (500 - Internal Server Error)
+
+```json
+{
+  "error": "CLEANUP_FAILED",
+  "message": "Cleanup job failed to complete",
+  "details": "Database connection error"
+}
+```
+
+**Trigger**: Critical failure preventing cleanup execution
+
+---
+
+## Implementation Notes
+
+### Server-Side Process
+
+1. **Query expired slides**:
+   ```sql
+   SELECT id, r2_key, filename, uploaded_at
+   FROM slides
+   WHERE uploaded_at < NOW() - INTERVAL '48 hours'
+     AND deleted_at IS NULL
+     AND r2_key IS NOT NULL
+   ORDER BY uploaded_at ASC
+   LIMIT 1000;  -- Process in batches to avoid timeout
+   ```
+
+2. **Delete from R2** (for each slide):
+   ```typescript
+   import { S3Client, DeleteObjectCommand } from '@aws-sdk/client-s3';
+
+   for (const slide of expiredSlides) {
+     try {
+       const command = new DeleteObjectCommand({
+         Bucket: process.env.R2_BUCKET_NAME,
+         Key: slide.r2_key,
+       });
+       await r2Client.send(command);
+
+       // Mark as deleted in database
+       await supabase
+         .from('slides')
+         .update({ deleted_at: new Date().toISOString() })
+         .eq('id', slide.id);
+
+       deletedCount++;
+     } catch (error) {
+       errors.push({
+         slide_id: slide.id,
+         r2_key: slide.r2_key,
+         error: error.message,
+       });
+     }
+   }
+   ```
+
+3. **Log results**:
+   ```typescript
+   console.log(`[Cleanup] Deleted ${deletedCount}/${processedCount} files`);
+   if (errors.length > 0) {
+     console.error(`[Cleanup] Errors:`, JSON.stringify(errors, null, 2));
+   }
+   ```
+
+4. **Return summary**: Include counts, errors, execution time
+
+### Netlify Configuration
+
+**In `netlify.toml`**:
+```toml
+[[functions]]
+  path = "/api/cleanup"
+  schedule = "0 */6 * * *"  # Every 6 hours at minute 0
+```
+
+**Schedule Options**:
+- `0 */6 * * *` - Every 6 hours at :00 (00:00, 06:00, 12:00, 18:00)
+- `@every 6h` - Simplified syntax (every 6 hours from deploy time)
+- `0 0,6,12,18 * * *` - Explicit times (00:00, 06:00, 12:00, 18:00 UTC)
+
+### Retention Logic
+
+**48-Hour Window**:
+- File uploaded at: `2025-10-09 10:00:00 UTC`
+- Becomes eligible for deletion at: `2025-10-11 10:00:00 UTC`
+- First cleanup run after eligibility: Next 6-hour interval (e.g., 12:00)
+- Actual deletion: `2025-10-11 12:00:00 UTC` (~50 hours after upload)
+
+**Query Explanation**:
+```sql
+WHERE uploaded_at < NOW() - INTERVAL '48 hours'
+```
+- Ensures at least 48 hours have passed
+- Slightly delayed deletion (up to 6 hours) is acceptable
+
+### Error Handling Strategy
+
+1. **R2 Delete Fails**: Mark as deleted in DB anyway (file may already be gone)
+2. **DB Update Fails**: Retry on next run (6 hours later)
+3. **Batch Processing**: Process 1000 files at a time to avoid timeout
+4. **Logging**: All errors logged for monitoring
+
+### Performance Considerations
+
+- **Batch size**: 1000 slides per run (prevents timeout)
+- **Timeout limit**: Netlify Functions have 10s timeout (should be sufficient)
+- **Parallelization**: Delete operations can be parallelized (Promise.allSettled)
+- **Monitoring**: Log execution time, error rate
+
+### Security Considerations
+
+- **No external auth**: Function only triggered by Netlify scheduler
+- **Verify trigger**: Check `x-netlify-event` header (optional)
+- **Audit trail**: `deleted_at` column preserves deletion timestamp
+
+---
+
+## Test Cases
+
+### Contract Test: Cleanup Deletes Expired Files
+```typescript
+test('POST /api/cleanup deletes files older than 48 hours', async () => {
+  // Create slides with various ages
+  const oldSlide1 = await createTestSlide({
+    uploaded_at: new Date(Date.now() - 49 * 60 * 60 * 1000), // 49h ago
+    r2_key: 'tenant-abc/event-xyz/slide-old1.pdf',
+  });
+  const oldSlide2 = await createTestSlide({
+    uploaded_at: new Date(Date.now() - 50 * 60 * 60 * 1000), // 50h ago
+    r2_key: 'tenant-abc/event-xyz/slide-old2.pdf',
+  });
+  const recentSlide = await createTestSlide({
+    uploaded_at: new Date(Date.now() - 24 * 60 * 60 * 1000), // 24h ago
+    r2_key: 'tenant-abc/event-xyz/slide-recent.pdf',
+  });
+
+  const response = await request(app)
+    .post('/api/cleanup')
+    .set('x-netlify-event', 'schedule');
+
+  expect(response.status).toBe(200);
+  expect(response.body.deleted_count).toBe(2);
+  expect(response.body.processed_count).toBe(2);
+  expect(response.body.errors).toHaveLength(0);
+
+  // Verify database updates
+  const deletedSlides = await supabase
+    .from('slides')
+    .select('id, deleted_at')
+    .in('id', [oldSlide1.id, oldSlide2.id]);
+
+  expect(deletedSlides.data).toHaveLength(2);
+  deletedSlides.data.forEach(slide => {
+    expect(slide.deleted_at).not.toBeNull();
+  });
+
+  // Verify recent slide not deleted
+  const recentSlideCheck = await supabase
+    .from('slides')
+    .select('deleted_at')
+    .eq('id', recentSlide.id)
+    .single();
+
+  expect(recentSlideCheck.data.deleted_at).toBeNull();
+});
+```
+
+### Contract Test: Handles R2 Errors Gracefully
+```typescript
+test('POST /api/cleanup continues after R2 errors', async () => {
+  // Create slide with invalid R2 key (simulate R2 error)
+  const invalidSlide = await createTestSlide({
+    uploaded_at: new Date(Date.now() - 50 * 60 * 60 * 1000),
+    r2_key: 'nonexistent/slide.pdf', // File doesn't exist in R2
+  });
+
+  const validSlide = await createTestSlide({
+    uploaded_at: new Date(Date.now() - 50 * 60 * 60 * 1000),
+    r2_key: 'tenant-abc/event-xyz/slide-valid.pdf',
+  });
+
+  // Mock R2 to succeed for valid, fail for invalid
+  // (Implementation-specific mocking)
+
+  const response = await request(app)
+    .post('/api/cleanup')
+    .set('x-netlify-event', 'schedule');
+
+  expect(response.status).toBe(200);
+  expect(response.body.processed_count).toBe(2);
+  expect(response.body.deleted_count).toBe(1); // Only valid slide
+  expect(response.body.errors).toHaveLength(1);
+  expect(response.body.errors[0].slide_id).toBe(invalidSlide.id);
+});
+```
+
+### Contract Test: Respects 48-Hour Boundary
+```typescript
+test('POST /api/cleanup respects 48-hour retention exactly', async () => {
+  const now = Date.now();
+
+  // Exactly 48 hours ago (should NOT be deleted - boundary case)
+  const boundarySlide = await createTestSlide({
+    uploaded_at: new Date(now - 48 * 60 * 60 * 1000),
+    r2_key: 'tenant-abc/event-xyz/slide-boundary.pdf',
+  });
+
+  // 48 hours + 1 second ago (should be deleted)
+  const expiredSlide = await createTestSlide({
+    uploaded_at: new Date(now - (48 * 60 * 60 * 1000 + 1000)),
+    r2_key: 'tenant-abc/event-xyz/slide-expired.pdf',
+  });
+
+  const response = await request(app)
+    .post('/api/cleanup')
+    .set('x-netlify-event', 'schedule');
+
+  expect(response.status).toBe(200);
+  expect(response.body.deleted_count).toBe(1);
+
+  // Verify only expired slide was deleted
+  const boundaryCheck = await supabase
+    .from('slides')
+    .select('deleted_at')
+    .eq('id', boundarySlide.id)
+    .single();
+  expect(boundaryCheck.data.deleted_at).toBeNull();
+
+  const expiredCheck = await supabase
+    .from('slides')
+    .select('deleted_at')
+    .eq('id', expiredSlide.id)
+    .single();
+  expect(expiredCheck.data.deleted_at).not.toBeNull();
+});
+```
+
+### Integration Test: Full Cleanup Cycle
+```typescript
+test('Cleanup function runs on schedule and deletes files', async () => {
+  // This test would verify:
+  // 1. Netlify scheduler triggers function
+  // 2. Function executes within timeout
+  // 3. Files deleted from R2
+  // 4. Database updated correctly
+  // 5. Logs generated
+
+  // Implementation depends on Netlify local testing tools
+});
+```
+
+---
+
+## Monitoring & Observability
+
+### Recommended Logging
+```typescript
+console.log({
+  event: 'cleanup_started',
+  timestamp: new Date().toISOString(),
+});
+
+console.log({
+  event: 'cleanup_completed',
+  deleted_count: deletedCount,
+  processed_count: processedCount,
+  error_count: errors.length,
+  execution_time_ms: Date.now() - startTime,
+});
+
+if (errors.length > 0) {
+  console.error({
+    event: 'cleanup_errors',
+    errors: errors,
+  });
+}
+```
+
+### Alerts (Optional)
+- Alert if `error_count > 5` (many failures)
+- Alert if `execution_time_ms > 8000` (approaching timeout)
+- Alert if cleanup hasn't run in 7+ hours (scheduler failure)
+
+---
+
+**Related Contracts**:
+- [presigned-upload.yml](./presigned-upload.yml) - Creates slides that cleanup will delete
+- [presigned-download.yml](./presigned-download.yml) - Returns 404 for deleted files

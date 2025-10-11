@@ -1,0 +1,107 @@
+# API Contract: Slide Metadata Retrieval
+
+**Endpoint**: `GET /api/slides/[id]`
+**Purpose**: Retrieve slide metadata without generating presigned URL
+**Authentication**: Required (validates RLS access)
+
+## Request
+
+### URL Parameters
+```yaml
+id: string  # UUID of the slide
+```
+
+### Headers
+```yaml
+Authorization: Bearer {supabase_jwt_token}
+```
+
+---
+
+## Response: Success (200)
+
+```typescript
+{
+  id: string;              // UUID
+  session_id: string;      // UUID of parent session
+  filename: string;        // Original filename
+  file_size: number;       // Size in bytes
+  mime_type: string;       // MIME type
+  uploaded_at: string;     // ISO timestamp
+  deleted_at: string | null;  // ISO timestamp or null
+  r2_key: string | null;   // R2 object key (null for legacy files)
+}
+```
+
+### Example
+```json
+{
+  "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+  "session_id": "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
+  "filename": "presentation.pdf",
+  "file_size": 2048576,
+  "mime_type": "application/pdf",
+  "uploaded_at": "2025-10-09T14:30:00Z",
+  "deleted_at": null,
+  "r2_key": "tenant-550e8400-e29b-41d4-a716-446655440000/event-6ba7b810-9dad-11d1-80b4-00c04fd430c8/slide-f47ac10b-58cc-4372-a567-0e02b2c3d479.pdf"
+}
+```
+
+---
+
+## Response: Error (403 - Forbidden)
+
+```json
+{
+  "error": "ACCESS_DENIED",
+  "message": "You do not have permission to access this slide"
+}
+```
+
+---
+
+## Response: Error (404 - Not Found)
+
+```json
+{
+  "error": "SLIDE_NOT_FOUND",
+  "message": "Slide not found"
+}
+```
+
+---
+
+## Test Cases
+
+### Contract Test: Retrieve Metadata
+```typescript
+test('GET /api/slides/:id returns slide metadata', async () => {
+  const slide = await createTestSlide({
+    session_id: validSessionId,
+    filename: 'test.pdf',
+    file_size: 1024000,
+    r2_key: 'tenant-abc/event-xyz/slide-123.pdf',
+  });
+
+  const response = await request(app)
+    .get(`/api/slides/${slide.id}`)
+    .set('Authorization', `Bearer ${adminToken}`);
+
+  expect(response.status).toBe(200);
+  expect(response.body).toMatchObject({
+    id: slide.id,
+    session_id: validSessionId,
+    filename: 'test.pdf',
+    file_size: 1024000,
+    mime_type: 'application/pdf',
+    deleted_at: null,
+    r2_key: 'tenant-abc/event-xyz/slide-123.pdf',
+  });
+});
+```
+
+---
+
+**Related Contracts**:
+- [presigned-upload.yml](./presigned-upload.yml) - Creates slide metadata
+- [presigned-download.yml](./presigned-download.yml) - Uses metadata for download

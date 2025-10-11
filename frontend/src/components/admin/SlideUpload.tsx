@@ -1,32 +1,27 @@
 'use client';
 
-// Feature 005: Slide Upload Component
-// Upload and manage slides for a speech
+// Feature 008: R2 Storage - Slide Upload Component
+// Upload slides directly to Cloudflare R2 using presigned URLs
 
 import { useState, useEffect } from 'react';
-
-interface Slide {
-  id: string;
-  filename: string;
-  file_size: number;
-  mime_type: string;
-  display_order: number;
-  uploaded_at: string;
-  uploaded_by: string;
-}
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import type { Slide, SlideUploadRequest, SlideUploadResponse } from '@/types/slide';
+import * as R2 from '@/lib/r2';
 
 interface SlideUploadProps {
   eventId: string;
-  speechId: string;
-  accessToken: string;
+  sessionId: string; // Session ID (formerly speechId)
 }
 
-export default function SlideUpload({ eventId, speechId, accessToken }: SlideUploadProps) {
+export default function SlideUpload({ eventId, sessionId }: SlideUploadProps) {
+  const supabase = createClientComponentClient();
   const [slides, setSlides] = useState<Slide[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [loading, setLoading] = useState(true);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Fetch existing slides
   useEffect(() => {
@@ -35,43 +30,38 @@ export default function SlideUpload({ eventId, speechId, accessToken }: SlideUpl
 
   const fetchSlides = async () => {
     try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/speeches/${speechId}/slides`,
-        {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
-        }
-      );
+      // Query slides from Supabase directly (RLS enforces tenant isolation)
+      const { data, error: fetchError } = await supabase
+        .from('slides')
+        .select('id, filename, file_size, mime_type, display_order, uploaded_at, uploaded_by, r2_key, deleted_at')
+        .eq('session_id', sessionId)
+        .is('deleted_at', null) // Only show non-deleted slides
+        .order('display_order', { ascending: true });
 
-      if (response.ok) {
-        const data = await response.json();
-        setSlides(data);
+      if (fetchError) {
+        console.error('Fetch slides error:', fetchError);
+        setError('Failed to load slides');
+        return;
       }
+
+      setSlides(data || []);
     } catch (error) {
       console.error('Fetch slides error:', error);
+      setError('Failed to load slides');
     } finally {
       setLoading(false);
     }
   };
 
   const validateFile = (file: File): string | null => {
-    // Validate file type
-    const allowedTypes = [
-      'application/pdf',
-      'application/vnd.ms-powerpoint',
-      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-      'application/vnd.oasis.opendocument.presentation',
-      'application/x-iwork-keynote-sffkey',
-    ];
-
-    if (!allowedTypes.includes(file.type) && !file.name.endsWith('.key')) {
-      return 'Tipo di file non valido. Usa PDF, PPT, PPTX, KEY o ODP.';
+    // Validate file type using R2 validation
+    if (!R2.validateFileType(file.type)) {
+      return R2.getFileTypeError(file.type);
     }
 
-    // Validate file size (100MB max)
-    if (file.size > 100 * 1024 * 1024) {
-      return 'File troppo grande. Dimensione massima: 100MB';
+    // Validate file size (1GB max)
+    if (!R2.validateFileSize(file.size)) {
+      return R2.getFileSizeError(file.size);
     }
 
     return null;
@@ -81,12 +71,13 @@ export default function SlideUpload({ eventId, speechId, accessToken }: SlideUpl
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const error = validateFile(file);
-    if (error) {
-      alert(error);
+    const validationError = validateFile(file);
+    if (validationError) {
+      setError(validationError);
       return;
     }
 
+    setError(null);
     setSelectedFile(file);
   };
 
@@ -115,12 +106,13 @@ export default function SlideUpload({ eventId, speechId, accessToken }: SlideUpl
     const file = e.dataTransfer.files?.[0];
     if (!file) return;
 
-    const error = validateFile(file);
-    if (error) {
-      alert(error);
+    const validationError = validateFile(file);
+    if (validationError) {
+      setError(validationError);
       return;
     }
 
+    setError(null);
     setSelectedFile(file);
   };
 
@@ -129,67 +121,132 @@ export default function SlideUpload({ eventId, speechId, accessToken }: SlideUpl
     if (!selectedFile) return;
 
     setUploading(true);
+    setUploadProgress(0);
+    setError(null);
 
     try {
-      const formData = new FormData();
-      formData.append('file', selectedFile);
-      formData.append('display_order', String(slides.length));
+      // -----------------------------------------------------------------------
+      // Step 1: Request presigned upload URL from Next.js API
+      // -----------------------------------------------------------------------
+      const uploadRequest: SlideUploadRequest = {
+        session_id: sessionId,
+        filename: selectedFile.name,
+        file_size: selectedFile.size,
+        mime_type: selectedFile.type,
+      };
 
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/speeches/${speechId}/slides`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
-          body: formData,
-        }
-      );
+      const presignedResponse = await fetch('/api/slides/presigned-upload', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(uploadRequest),
+      });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Upload failed');
+      if (!presignedResponse.ok) {
+        const errorData = await presignedResponse.json();
+        throw new Error(errorData.message || 'Failed to get upload URL');
       }
 
-      const newSlide = await response.json();
+      const uploadData: SlideUploadResponse = await presignedResponse.json();
+      setUploadProgress(10); // 10% - Got presigned URL
+
+      // -----------------------------------------------------------------------
+      // Step 2: Upload file directly to R2 using presigned URL
+      // -----------------------------------------------------------------------
+      const xhr = new XMLHttpRequest();
+
+      // Track upload progress
+      xhr.upload.addEventListener('progress', (event) => {
+        if (event.lengthComputable) {
+          // Map 10% to 90% of progress bar to actual upload
+          const percentComplete = 10 + Math.round((event.loaded / event.total) * 80);
+          setUploadProgress(percentComplete);
+        }
+      });
+
+      // Handle upload completion
+      await new Promise<void>((resolve, reject) => {
+        xhr.addEventListener('load', () => {
+          if (xhr.status === 200) {
+            setUploadProgress(95); // 95% - Upload complete
+            resolve();
+          } else {
+            reject(new Error(`R2 upload failed with status ${xhr.status}`));
+          }
+        });
+
+        xhr.addEventListener('error', () => {
+          reject(new Error('Network error during R2 upload'));
+        });
+
+        xhr.addEventListener('abort', () => {
+          reject(new Error('Upload cancelled'));
+        });
+
+        xhr.open('PUT', uploadData.upload_url);
+        xhr.setRequestHeader('Content-Type', selectedFile.type);
+        xhr.send(selectedFile);
+      });
+
+      // -----------------------------------------------------------------------
+      // Step 3: Fetch updated slide metadata and refresh list
+      // -----------------------------------------------------------------------
+      setUploadProgress(100);
+
+      // Create new slide object for immediate UI update
+      const newSlide: Slide = {
+        id: uploadData.slide_id,
+        filename: selectedFile.name,
+        file_size: selectedFile.size,
+        mime_type: selectedFile.type,
+        display_order: slides.length,
+        uploaded_at: new Date().toISOString(),
+        uploaded_by: 'current-user',
+        r2_key: uploadData.r2_key,
+        deleted_at: null,
+      };
+
       setSlides([...slides, newSlide]);
       setSelectedFile(null);
 
       // Reset file input
       const fileInput = document.getElementById('file-input') as HTMLInputElement;
       if (fileInput) fileInput.value = '';
+
+      // Show success briefly
+      setTimeout(() => setUploadProgress(0), 1000);
     } catch (error) {
       console.error('Upload error:', error);
-      alert(`Errore nell'upload: ${error instanceof Error ? error.message : 'Errore sconosciuto'}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      setError(`Upload failed: ${errorMessage}`);
+      setUploadProgress(0);
     } finally {
       setUploading(false);
     }
   };
 
   const handleDelete = async (slideId: string) => {
-    if (!confirm('Sei sicuro di voler eliminare questa slide?')) {
+    if (!confirm('Are you sure you want to delete this slide? It will be permanently removed after 48 hours.')) {
       return;
     }
 
     try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/slides/${slideId}`,
-        {
-          method: 'DELETE',
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
-        }
-      );
+      // Soft delete: Update deleted_at timestamp
+      const { error: deleteError } = await supabase
+        .from('slides')
+        .update({ deleted_at: new Date().toISOString() })
+        .eq('id', slideId);
 
-      if (!response.ok) {
-        throw new Error('Delete failed');
+      if (deleteError) {
+        throw deleteError;
       }
 
+      // Remove from UI immediately
       setSlides(slides.filter((s) => s.id !== slideId));
     } catch (error) {
       console.error('Delete error:', error);
-      alert('Errore nell\'eliminazione della slide');
+      setError('Failed to delete slide');
     }
   };
 
@@ -215,9 +272,22 @@ export default function SlideUpload({ eventId, speechId, accessToken }: SlideUpl
 
   return (
     <div className="space-y-6">
+      {/* Error Message */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <p className="text-sm font-medium text-red-800">{error}</p>
+          <button
+            onClick={() => setError(null)}
+            className="mt-2 text-xs text-red-600 hover:text-red-700 underline"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
       {/* Upload Form */}
       <div className="bg-white shadow rounded-lg p-6">
-        <h2 className="text-xl font-bold text-gray-900 mb-4">Carica Nuova Slide</h2>
+        <h2 className="text-xl font-bold text-gray-900 mb-4">Upload New Slide</h2>
 
         <form onSubmit={handleUpload} className="space-y-4">
           {/* Drag & Drop Zone */}
@@ -235,34 +305,52 @@ export default function SlideUpload({ eventId, speechId, accessToken }: SlideUpl
             <div className="space-y-2">
               <div className="text-4xl">📄</div>
               <p className="text-lg font-medium text-gray-900">
-                {isDragging ? 'Rilascia il file qui' : 'Trascina il file qui'}
+                {isDragging ? 'Drop file here' : 'Drag file here'}
               </p>
-              <p className="text-sm text-gray-600">oppure</p>
+              <p className="text-sm text-gray-600">or</p>
               <label className="inline-block cursor-pointer">
                 <span className="px-4 py-2 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700 transition">
-                  Scegli File
+                  Choose File
                 </span>
                 <input
                   id="file-input"
                   type="file"
-                  accept=".pdf,.ppt,.pptx,.key,.odp"
+                  accept=".pdf,.ppt,.pptx,.jpg,.jpeg,.png"
                   onChange={handleFileSelect}
                   className="hidden"
                   disabled={uploading}
                 />
               </label>
               <p className="text-xs text-gray-500 mt-2">
-                Formati supportati: PDF, PPT, PPTX, KEY, ODP (max 100MB)
+                Supported formats: PDF, PPT, PPTX, JPEG, PNG (max 1GB)
               </p>
             </div>
           </div>
 
           {selectedFile && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-              <p className="text-sm font-medium text-gray-900">File selezionato:</p>
-              <p className="text-sm text-gray-600">
-                {selectedFile.name} ({formatFileSize(selectedFile.size)})
-              </p>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-2">
+              <div>
+                <p className="text-sm font-medium text-gray-900">Selected file:</p>
+                <p className="text-sm text-gray-600">
+                  {selectedFile.name} ({formatFileSize(selectedFile.size)})
+                </p>
+              </div>
+
+              {/* Upload Progress Bar */}
+              {uploading && uploadProgress > 0 && (
+                <div className="space-y-1">
+                  <div className="flex justify-between text-xs text-gray-600">
+                    <span>Uploading...</span>
+                    <span>{uploadProgress}%</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                    <div
+                      className="bg-purple-600 h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${uploadProgress}%` }}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -271,7 +359,7 @@ export default function SlideUpload({ eventId, speechId, accessToken }: SlideUpl
             disabled={!selectedFile || uploading}
             className="px-4 py-2 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700 transition disabled:bg-gray-300 disabled:cursor-not-allowed"
           >
-            {uploading ? 'Caricamento...' : 'Carica Slide'}
+            {uploading ? 'Uploading...' : 'Upload Slide'}
           </button>
         </form>
       </div>
@@ -279,12 +367,12 @@ export default function SlideUpload({ eventId, speechId, accessToken }: SlideUpl
       {/* Slides List */}
       <div className="bg-white shadow rounded-lg p-6">
         <h2 className="text-xl font-bold text-gray-900 mb-4">
-          Slide Caricate ({slides.length})
+          Uploaded Slides ({slides.length})
         </h2>
 
         {slides.length === 0 ? (
           <p className="text-gray-500 text-center py-8">
-            Nessuna slide caricata. Inizia caricando il primo file.
+            No slides uploaded yet. Start by uploading your first file.
           </p>
         ) : (
           <div className="space-y-3">
@@ -314,7 +402,7 @@ export default function SlideUpload({ eventId, speechId, accessToken }: SlideUpl
                   onClick={() => handleDelete(slide.id)}
                   className="ml-4 px-3 py-1.5 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded transition"
                 >
-                  Elimina
+                  Delete
                 </button>
               </div>
             ))}

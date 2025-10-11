@@ -1,11 +1,10 @@
 'use client';
 
-// Feature 004: Public Event Page - Slide Download Component
-// Date: 2025-10-07
-// Individual slide download button with file info
+// Feature 008: R2 Storage - Slide Download Component
+// Individual slide download button using presigned R2 URLs
 
 import { useState } from 'react';
-import { getSlideDownloadUrl } from '@/services/eventClient';
+import type { SlideDownloadResponse } from '@/types/slide';
 
 interface SlideDownloadProps {
   slide: {
@@ -13,12 +12,13 @@ interface SlideDownloadProps {
     filename: string;
     file_size: number;
     mime_type: string;
-    download_url: string;
+    download_url?: string; // Legacy field (deprecated)
   };
 }
 
 export default function SlideDownload({ slide }: SlideDownloadProps) {
-  const [rateLimitError, setRateLimitError] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Format file size (bytes to human-readable)
   const formatFileSize = (bytes: number): string => {
@@ -54,29 +54,69 @@ export default function SlideDownload({ slide }: SlideDownloadProps) {
   };
 
   const handleDownload = async () => {
-    setRateLimitError(null);
+    setError(null);
+    setDownloading(true);
 
     try {
-      const downloadUrl = getSlideDownloadUrl(slide.id);
-      const response = await fetch(downloadUrl);
-
-      if (response.status === 429) {
-        const retryAfter = response.headers.get('Retry-After') || '1 hour';
-        setRateLimitError(
-          `Download limit exceeded. Please try again in ${retryAfter}.`
-        );
-        return;
-      }
+      // -----------------------------------------------------------------------
+      // Step 1: Request presigned download URL from Next.js API
+      // -----------------------------------------------------------------------
+      const response = await fetch(`/api/slides/${slide.id}/download`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
 
       if (!response.ok) {
-        throw new Error('Download failed');
+        const errorData = await response.json().catch(() => ({
+          error: 'DOWNLOAD_FAILED',
+          message: 'Failed to generate download URL',
+        }));
+
+        // Handle specific error cases
+        if (errorData.error === 'FILE_EXPIRED') {
+          setError('This file has been deleted. Files are automatically removed after 48 hours.');
+          return;
+        }
+
+        if (errorData.error === 'UNAUTHORIZED') {
+          setError('You do not have permission to download this file.');
+          return;
+        }
+
+        if (response.status === 404) {
+          setError('File not found or has been deleted.');
+          return;
+        }
+
+        throw new Error(errorData.message || 'Failed to download file');
       }
 
-      // Open download URL in new tab (browser will handle download)
-      window.open(downloadUrl, '_blank');
+      const downloadData: SlideDownloadResponse = await response.json();
+
+      // -----------------------------------------------------------------------
+      // Step 2: Download file from R2 using presigned URL
+      // -----------------------------------------------------------------------
+      // Create a temporary anchor element to trigger download
+      const link = document.createElement('a');
+      link.href = downloadData.download_url;
+      link.download = downloadData.filename;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+
+      // Trigger download
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      console.log(`Download initiated: ${downloadData.filename} (expires at ${downloadData.expires_at})`);
     } catch (error) {
       console.error('Download error:', error);
-      setRateLimitError('Failed to download file. Please try again.');
+      const errorMessage = error instanceof Error ? error.message : 'An error occurred';
+      setError(`Download failed: ${errorMessage}`);
+    } finally {
+      setDownloading(false);
     }
   };
 
@@ -94,27 +134,44 @@ export default function SlideDownload({ slide }: SlideDownloadProps) {
 
       <button
         onClick={handleDownload}
-        className="flex-shrink-0 ml-3 px-3 py-1.5 text-sm font-medium text-blue-600 bg-white border border-blue-600 rounded-md hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
+        disabled={downloading}
+        className="flex-shrink-0 ml-3 px-3 py-1.5 text-sm font-medium text-blue-600 bg-white border border-blue-600 rounded-md hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed"
         aria-label={`Download ${slide.filename}`}
       >
-        <svg
-          className="w-4 h-4"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-          />
-        </svg>
+        {downloading ? (
+          <svg
+            className="w-4 h-4 animate-spin"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+            />
+          </svg>
+        ) : (
+          <svg
+            className="w-4 h-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+            />
+          </svg>
+        )}
       </button>
 
-      {rateLimitError && (
+      {error && (
         <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-800">
-          {rateLimitError}
+          {error}
         </div>
       )}
     </div>

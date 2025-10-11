@@ -2,12 +2,197 @@
 
 Questa guida spiega come deployare ShareHub su servizi cloud.
 
-## Architettura
+## ⚠️ Architecture Update (Feature 008)
 
-ShareHub è composto da due parti:
+ShareHub ha migrato a un'architettura serverless. Esistono ora **due modi** per deployare:
 
+### Architettura Nuova (Serverless) ✅ Consigliata
+
+**Componenti:**
+1. **Frontend** (Next.js 14) → Netlify con Next.js API Routes
+2. **Storage** (Cloudflare R2) → File storage con presigned URLs
+3. **Database** (Supabase) → PostgreSQL con RLS
+
+**Vantaggi:**
+- ✅ Nessun costo per il backend (Fly.io rimosso)
+- ✅ File fino a 1GB supportati (vs 100MB precedente)
+- ✅ Download gratuiti illimitati (R2 non ha costi di egress)
+- ✅ Cleanup automatico (48 ore di retention)
+- ✅ Performance migliorate (CDN globale di Cloudflare)
+
+**Requisiti:**
+- Account Cloudflare (free tier disponibile)
+- Bucket R2 configurato (vedi [R2_SETUP.md](docs/R2_SETUP.md))
+- Database migrations applicate (vedi `backend/migrations/009-r2-storage-migration.sql`)
+
+📚 **Setup completo**: Segui [docs/R2_SETUP.md](docs/R2_SETUP.md) prima di deployare.
+
+### Architettura Legacy (Backend Dedicato) ⚠️ Deprecata
+
+**Componenti:**
 1. **Frontend** (Next.js 14) → Netlify
 2. **Backend** (Express API) → Railway/Render/Fly.io
+3. **Storage** (Supabase Storage) → File storage (100MB max)
+
+**Stato**: Deprecata a partire da Feature 008. Il backend verrà rimosso nelle versioni future.
+
+---
+
+## 🚀 Deploy Serverless (Consigliato)
+
+### Prerequisiti
+
+1. ✅ Account Netlify ([Sign up](https://app.netlify.com/signup))
+2. ✅ Account Cloudflare con R2 abilitato ([Sign up](https://dash.cloudflare.com/sign-up))
+3. ✅ Account Supabase ([Sign up](https://supabase.com))
+4. ✅ R2 bucket configurato → **Segui [docs/R2_SETUP.md](docs/R2_SETUP.md)**
+5. ✅ Database migrations applicate → Vedi `backend/migrations/README-APPLY-009.md`
+
+### Passo 1: Setup Cloudflare R2
+
+Segui la guida completa in [docs/R2_SETUP.md](docs/R2_SETUP.md).
+
+**Riepilogo**:
+1. Crea bucket R2 chiamato `sharehub-slides`
+2. Genera API credentials (Access Key ID, Secret Access Key)
+3. Configura CORS policy per permettere uploads dal browser
+4. Salva le credenziali (le userai nel Passo 3)
+
+### Passo 2: Applica Database Migrations
+
+```bash
+# Opzione A: Via Supabase CLI
+cd backend
+npx supabase db push
+
+# Opzione B: Via Supabase Dashboard
+# 1. Vai su https://supabase.com/dashboard → SQL Editor
+# 2. Copia e incolla il contenuto di backend/migrations/009-r2-storage-migration.sql
+# 3. Esegui la query
+```
+
+**Verifica migration**:
+```sql
+-- In Supabase SQL Editor
+SELECT column_name, data_type
+FROM information_schema.columns
+WHERE table_name = 'slides'
+  AND column_name IN ('r2_key', 'deleted_at');
+
+-- Dovresti vedere:
+-- r2_key       | text
+-- deleted_at   | timestamp with time zone
+```
+
+### Passo 3: Deploy su Netlify
+
+#### Opzione A: Deploy da GitHub (Consigliato)
+
+1. Vai su [Netlify](https://app.netlify.com/)
+2. Click **Add new site** → **Import an existing project**
+3. Seleziona GitHub e autorizza Netlify
+4. Scegli il repository: `3civette/sharehub`
+5. Netlify rileverà automaticamente `netlify.toml`
+6. **NON** deployare ancora - prima configura le variabili d'ambiente (vedi sotto)
+
+#### Opzione B: Deploy da CLI
+
+```bash
+# Installa Netlify CLI
+npm install -g netlify-cli
+
+# Login
+netlify login
+
+# Deploy (dalla root del progetto)
+cd frontend
+netlify deploy --prod
+```
+
+### Passo 4: Configura Environment Variables su Netlify
+
+Vai su **Site settings → Environment variables** e aggiungi:
+
+```bash
+# Supabase Configuration
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGc...your_anon_key
+SUPABASE_SERVICE_ROLE_KEY=eyJhbGc...your_service_role_key  # ⚠️ SECRET
+
+# Cloudflare R2 Configuration (da Passo 1)
+R2_ACCOUNT_ID=a1b2c3d4...your_account_id
+R2_ACCESS_KEY_ID=1a2b3c4d...your_access_key_id
+R2_SECRET_ACCESS_KEY=A1B2C3D4...your_secret_access_key  # ⚠️ SECRET
+R2_BUCKET_NAME=sharehub-slides
+```
+
+⚠️ **IMPORTANTE**:
+- `SUPABASE_SERVICE_ROLE_KEY` è richiesto per la cleanup function (bypassa RLS)
+- Non confondere con `NEXT_PUBLIC_SUPABASE_ANON_KEY` (pubblico)
+
+### Passo 5: Deploy!
+
+1. Click **Deploy site** su Netlify
+2. Attendi il completamento del build (2-3 minuti)
+3. Netlify ti darà un URL: `https://your-site-name.netlify.app`
+
+### Passo 6: Verifica Deployment
+
+#### Test Upload
+
+1. Vai su `https://your-site.netlify.app/admin/events`
+2. Crea un evento e aggiungi una session
+3. Carica una slide (prova con un file PDF)
+4. **Verifica in R2**: Vai su Cloudflare Dashboard → R2 → `sharehub-slides` → Dovresti vedere il file
+
+#### Test Download
+
+1. Vai alla pagina pubblica dell'evento
+2. Click su download di una slide
+3. Il file dovrebbe scaricarsi direttamente da R2
+
+#### Test Scheduled Cleanup
+
+La cleanup function viene eseguita automaticamente ogni 6 ore da Netlify.
+
+**Verifica configurazione**:
+1. Vai su Netlify Dashboard → **Functions**
+2. Dovresti vedere `cleanup` nella lista
+3. Click su cleanup → **Logs** per vedere le esecuzioni
+
+**Test manuale** (opzionale):
+```bash
+# Trigger cleanup manualmente (richiede autenticazione)
+curl -X POST https://your-site.netlify.app/api/cleanup
+```
+
+### Passo 7: Configura Custom Domain (Opzionale)
+
+1. Vai su Netlify Dashboard → **Domain settings**
+2. Click **Add custom domain**
+3. Aggiungi il tuo dominio (es. `sharehub.example.com`)
+4. Segui le istruzioni per configurare i DNS records
+5. Netlify provvederà automaticamente SSL certificate via Let's Encrypt
+
+**Aggiorna CORS su R2**:
+Dopo aver aggiunto il custom domain, aggiorna la CORS policy del bucket R2:
+
+```json
+{
+  "AllowedOrigins": [
+    "http://localhost:3000",
+    "https://your-site.netlify.app",
+    "https://sharehub.example.com"  ← Aggiungi il tuo dominio
+  ],
+  ...
+}
+```
+
+---
+
+## 🔧 Deploy Backend Legacy (Deprecato)
+
+⚠️ **Attenzione**: Questa sezione documenta l'architettura legacy (prima di Feature 008). Il backend dedicato verrà rimosso nelle versioni future.
 
 ## 🚀 Deploy Frontend su Netlify
 

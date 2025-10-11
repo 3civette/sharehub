@@ -1,7 +1,7 @@
 {
   "name": "sharehub-backend",
-  "version": "1.0.0-deprecated",
-  "description": "[DEPRECATED] ShareHub Backend API - Migrated to Next.js API Routes (Feature 008)",
+  "version": "1.0.0",
+  "description": "ShareHub Backend API",
   "main": "dist/app.js",
   "scripts": {
     "dev": "tsx watch --env-file=.env src/app.ts",

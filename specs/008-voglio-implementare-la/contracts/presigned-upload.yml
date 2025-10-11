@@ -1,0 +1,247 @@
+# API Contract: Generate Presigned Upload URL
+
+**Endpoint**: `POST /api/slides/presigned-upload`
+**Purpose**: Generate a presigned URL for direct R2 upload
+**Authentication**: Required (admin user via Supabase auth)
+
+## Request
+
+### Headers
+```yaml
+Content-Type: application/json
+Authorization: Bearer {supabase_jwt_token}
+```
+
+### Body
+```typescript
+{
+  session_id: string;      // UUID of the session (must belong to user's tenant)
+  filename: string;        // Original filename (e.g., "presentation.pdf")
+  file_size: number;       // Size in bytes (1 - 1073741824)
+  mime_type: string;       // MIME type (validated enum)
+}
+```
+
+### Validation Rules
+- `session_id`: Must be valid UUID, session must exist and belong to user's tenant
+- `filename`: 1-255 characters, must have valid extension
+- `file_size`: 1 ≤ size ≤ 1073741824 (1GB)
+- `mime_type`: Must be in allowed list:
+  - `application/pdf`
+  - `application/vnd.ms-powerpoint`
+  - `application/vnd.openxmlformats-officedocument.presentationml.presentation`
+  - `image/jpeg`
+  - `image/png`
+
+---
+
+## Response: Success (200)
+
+```typescript
+{
+  upload_url: string;      // Presigned R2 URL (valid 1 hour)
+  slide_id: string;        // UUID of created metadata record
+  r2_key: string;          // R2 object key (for reference)
+  expires_at: string;      // ISO timestamp when URL expires
+}
+```
+
+### Example
+```json
+{
+  "upload_url": "https://abc123.r2.cloudflarestorage.com/sharehub-slides/tenant-550e8400-e29b-41d4-a716-446655440000/event-6ba7b810-9dad-11d1-80b4-00c04fd430c8/slide-f47ac10b-58cc-4372-a567-0e02b2c3d479.pdf?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=...",
+  "slide_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+  "r2_key": "tenant-550e8400-e29b-41d4-a716-446655440000/event-6ba7b810-9dad-11d1-80b4-00c04fd430c8/slide-f47ac10b-58cc-4372-a567-0e02b2c3d479.pdf",
+  "expires_at": "2025-10-11T15:30:00Z"
+}
+```
+
+---
+
+## Response: Error (400 - Bad Request)
+
+```typescript
+{
+  error: string;           // Error code
+  message: string;         // Human-readable message
+  field?: string;          // Field that caused error (if applicable)
+}
+```
+
+### Error Cases
+
+#### File Size Exceeded
+```json
+{
+  "error": "FILE_SIZE_EXCEEDS_LIMIT",
+  "message": "File size exceeds 1GB limit",
+  "field": "file_size"
+}
+```
+
+#### Invalid File Type
+```json
+{
+  "error": "INVALID_FILE_TYPE",
+  "message": "File type not allowed. Allowed types: PDF, PPT, PPTX, JPEG, PNG",
+  "field": "mime_type"
+}
+```
+
+#### Invalid Session
+```json
+{
+  "error": "INVALID_SESSION",
+  "message": "Session not found or access denied",
+  "field": "session_id"
+}
+```
+
+#### Missing Fields
+```json
+{
+  "error": "MISSING_REQUIRED_FIELD",
+  "message": "Required field missing: filename",
+  "field": "filename"
+}
+```
+
+---
+
+## Response: Error (401 - Unauthorized)
+
+```json
+{
+  "error": "UNAUTHORIZED",
+  "message": "Authentication required"
+}
+```
+
+---
+
+## Response: Error (500 - Internal Server Error)
+
+```json
+{
+  "error": "R2_CONNECTION_FAILED",
+  "message": "Failed to generate upload URL. Please try again."
+}
+```
+
+---
+
+## Implementation Notes
+
+### Server-Side Process
+1. **Authenticate**: Verify JWT token, extract user ID
+2. **Validate session**: Check session exists and belongs to user's tenant (RLS)
+3. **Validate inputs**: File size, MIME type, filename
+4. **Create metadata record**:
+   ```sql
+   INSERT INTO slides (id, session_id, filename, file_size, mime_type, tenant_id, r2_key, uploaded_at)
+   VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+   ```
+5. **Generate R2 key**: `tenant-{tenant_id}/event-{event_id}/slide-{slide_id}.{ext}`
+6. **Generate presigned URL**: Using AWS SDK S3Client + getSignedUrl
+7. **Return response**: Include upload_url, slide_id, r2_key, expires_at
+
+### Client-Side Process
+1. **Call API**: POST /api/slides/presigned-upload with file metadata
+2. **Receive presigned URL**: Extract `upload_url` from response
+3. **Upload file**: PUT request directly to R2 URL with file binary
+   ```typescript
+   await fetch(upload_url, {
+     method: 'PUT',
+     body: fileBlob,
+     headers: {
+       'Content-Type': mime_type,
+     },
+   });
+   ```
+4. **Verify upload**: Optional - check R2 response status (200 = success)
+
+### Security Considerations
+- Presigned URLs expire after 1 hour (3600 seconds)
+- URL is single-use intent (can be reused within 1h, but shouldn't be)
+- R2 key structure includes tenant ID (tenant isolation)
+- RLS policies prevent cross-tenant session access
+- File size enforced at both client and server
+
+### Performance Targets
+- Response time: <500ms (URL generation is fast)
+- Database insert: <50ms
+- R2 presigned URL generation: <100ms
+
+---
+
+## Test Cases
+
+### Contract Test: Valid Upload Request
+```typescript
+test('POST /api/slides/presigned-upload returns valid presigned URL', async () => {
+  const response = await request(app)
+    .post('/api/slides/presigned-upload')
+    .set('Authorization', `Bearer ${adminToken}`)
+    .send({
+      session_id: validSessionId,
+      filename: 'test.pdf',
+      file_size: 1024000, // 1MB
+      mime_type: 'application/pdf',
+    });
+
+  expect(response.status).toBe(200);
+  expect(response.body).toMatchObject({
+    upload_url: expect.stringContaining('r2.cloudflarestorage.com'),
+    slide_id: expect.stringMatching(/^[0-9a-f-]{36}$/),
+    r2_key: expect.stringContaining('tenant-'),
+    expires_at: expect.any(String),
+  });
+
+  // Verify URL contains required query params
+  const url = new URL(response.body.upload_url);
+  expect(url.searchParams.has('X-Amz-Algorithm')).toBe(true);
+  expect(url.searchParams.has('X-Amz-Expires')).toBe(true);
+});
+```
+
+### Contract Test: File Too Large
+```typescript
+test('POST /api/slides/presigned-upload rejects files >1GB', async () => {
+  const response = await request(app)
+    .post('/api/slides/presigned-upload')
+    .set('Authorization', `Bearer ${adminToken}`)
+    .send({
+      session_id: validSessionId,
+      filename: 'huge.pdf',
+      file_size: 1073741825, // 1GB + 1 byte
+      mime_type: 'application/pdf',
+    });
+
+  expect(response.status).toBe(400);
+  expect(response.body.error).toBe('FILE_SIZE_EXCEEDS_LIMIT');
+});
+```
+
+### Contract Test: Invalid MIME Type
+```typescript
+test('POST /api/slides/presigned-upload rejects invalid MIME types', async () => {
+  const response = await request(app)
+    .post('/api/slides/presigned-upload')
+    .set('Authorization', `Bearer ${adminToken}`)
+    .send({
+      session_id: validSessionId,
+      filename: 'test.exe',
+      file_size: 1024,
+      mime_type: 'application/x-executable',
+    });
+
+  expect(response.status).toBe(400);
+  expect(response.body.error).toBe('INVALID_FILE_TYPE');
+});
+```
+
+---
+
+**Related Contracts**:
+- [presigned-download.yml](./presigned-download.yml) - Download presigned URLs
+- [slide-metadata.yml](./slide-metadata.yml) - Slide metadata CRUD

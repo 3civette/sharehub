@@ -150,8 +150,13 @@ export async function fetchPublicMetrics(slug: string): Promise<PublicMetrics> {
  * Get download URL for single slide
  * @param slideId Slide UUID
  * @returns Download URL
+ * @deprecated Since Feature 008: Use Next.js API route /api/slides/[id]/download directly
+ * @see SlideDownload component for the new implementation with presigned R2 URLs
  */
 export function getSlideDownloadUrl(slideId: string): string {
+  // DEPRECATED: This function points to the old backend
+  // New implementation uses Next.js API route: /api/slides/[id]/download
+  // which generates presigned R2 download URLs
   return `${API_BASE_URL}/api/public/slides/${slideId}/download`;
 }
 

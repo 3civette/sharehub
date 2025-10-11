@@ -427,4 +427,482 @@ npm run lint             # Lint code
 
 **Benefits**: Consistent UX, reusable validation, better accessibility
 
+## Feature-Specific Patterns (008-voglio-implementare-la)
+
+### Serverless Architecture with Cloudflare R2
+**Pattern**: Direct client-to-storage uploads/downloads using presigned URLs
+**Location**: `frontend/src/lib/r2.ts`, `frontend/src/app/api/slides/`
+
+**Architecture**:
+```
+Client → Next.js API Route → Presigned URL → Direct R2 Upload/Download
+   ↓
+Supabase (metadata only: r2_key, file_size, mime_type)
+```
+
+**Key Benefits**:
+- No backend proxy (zero bandwidth costs)
+- Files up to 1GB (vs 100MB with proxied uploads)
+- CDN-powered downloads (global edge caching)
+- 99% cost reduction ($15/month → $0.15/month)
+
+### R2 Client with Error Handling
+**Pattern**: AWS SDK S3Client wrapper with custom error classes
+**Location**: `frontend/src/lib/r2.ts`
+
+```typescript
+// Initialize R2 client (singleton)
+const r2Client = new S3Client({
+  region: 'auto',
+  endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+  credentials: {
+    accessKeyId: process.env.R2_ACCESS_KEY_ID!,
+    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
+  },
+});
+
+// Generate presigned upload URL
+export async function generatePresignedUploadUrl(
+  r2Key: string,
+  contentType: string,
+  expirySeconds: number = 3600
+): Promise<string> {
+  try {
+    const command = new PutObjectCommand({
+      Bucket: R2_CONFIG.bucketName,
+      Key: r2Key,
+      ContentType: contentType,
+    });
+
+    return await getSignedUrl(r2Client, command, { expiresIn: expirySeconds });
+  } catch (error) {
+    // Handle specific errors: network, credentials, bucket, quota
+    if (errorMessage.includes('network')) {
+      throw new R2UploadError('Network error: Unable to connect to R2');
+    }
+    // ... other error handling
+  }
+}
+```
+
+**Custom Error Classes**:
+- `R2ConfigError` - Missing or invalid environment variables
+- `R2UploadError` - Upload URL generation failures
+- `R2DownloadError` - Download URL generation failures (file not found, etc.)
+- `R2DeleteError` - Deletion failures (permissions, network)
+
+**Error Types Handled**:
+- Network errors (ENOTFOUND, ECONNREFUSED)
+- Credentials errors (InvalidAccessKeyId, access denied)
+- Bucket errors (NoSuchBucket, wrong bucket name)
+- Object errors (NoSuchKey, file not found)
+- Quota errors (storage limit exceeded)
+- Permission errors (missing delete permissions)
+
+**Benefits**: Clear error messages for debugging, user-friendly error handling
+
+### R2 Key Generation with Tenant Isolation
+**Pattern**: Hierarchical object keys for multi-tenant security
+**Location**: `frontend/src/lib/r2.ts:generateR2Key()`
+
+```typescript
+// Format: tenant-{uuid}/event-{uuid}/slide-{uuid}.{ext}
+export function generateR2Key(
+  tenantId: string,
+  eventId: string,
+  slideId: string,
+  filename: string
+): string {
+  const extension = filename.split('.').pop()?.toLowerCase() || 'bin';
+  return `tenant-${tenantId}/event-${eventId}/slide-${slideId}.${extension}`;
+}
+
+// Example: tenant-550e8400/event-6ba7b810/slide-f47ac10b.pdf
+```
+
+**Benefits**:
+- Tenant isolation at storage level
+- Easy to query/delete by tenant or event
+- Prevents filename collisions
+- Preserves original file extension
+
+### Presigned URL Upload Flow
+**Pattern**: Two-phase upload (generate URL → direct upload)
+**Location**: `frontend/src/app/api/slides/presigned-upload/route.ts`
+
+**Phase 1: Generate Presigned URL** (Next.js API Route)
+```typescript
+// POST /api/slides/presigned-upload
+export async function POST(request: NextRequest) {
+  const { filename, fileSize, mimeType, speechId } = await request.json();
+
+  // Validate file
+  if (!R2.validateFileType(mimeType)) {
+    return NextResponse.json({ error: 'Invalid file type' }, { status: 400 });
+  }
+
+  // Generate R2 key with tenant isolation
+  const r2Key = R2.generateKey(tenantId, eventId, slideId, filename);
+
+  // Generate presigned upload URL (expires in 1 hour)
+  const uploadUrl = await R2.generateUploadUrl(r2Key, mimeType);
+
+  // Save metadata to database
+  await supabase.from('slides').insert({
+    id: slideId,
+    r2_key: r2Key,
+    filename,
+    file_size: fileSize,
+    mime_type: mimeType,
+    // storage_path: null (not using Supabase Storage)
+  });
+
+  return NextResponse.json({ uploadUrl, slideId });
+}
+```
+
+**Phase 2: Client Direct Upload**
+```typescript
+// Client-side upload using presigned URL
+const response = await fetch(uploadUrl, {
+  method: 'PUT',
+  headers: { 'Content-Type': mimeType },
+  body: file, // File object from <input type="file">
+});
+
+if (response.ok) {
+  console.log('Upload complete! File is on R2.');
+}
+```
+
+**Benefits**:
+- Backend only generates URLs (fast, <500ms)
+- Client uploads directly to R2 (no bandwidth costs)
+- Presigned URLs expire after 1 hour (security)
+- Metadata saved before upload (prevents orphaned files)
+
+### Presigned URL Download Flow
+**Pattern**: Generate download URL on-demand
+**Location**: `frontend/src/app/api/slides/[id]/download/route.ts`
+
+```typescript
+// GET /api/slides/:id/download
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  // Fetch slide metadata from database
+  const { data: slide } = await supabase
+    .from('slides')
+    .select('r2_key, filename')
+    .eq('id', params.id)
+    .single();
+
+  if (!slide.r2_key) {
+    return NextResponse.json({ error: 'File not found' }, { status: 404 });
+  }
+
+  // Generate presigned download URL (expires in 1 hour)
+  const downloadUrl = await R2.generateDownloadUrl(slide.r2_key);
+
+  // Track download metrics (async, don't block)
+  trackDownload(params.id).catch(console.error);
+
+  // Redirect to presigned URL
+  return NextResponse.redirect(downloadUrl);
+}
+```
+
+**Benefits**:
+- Downloads served directly from R2 CDN
+- URLs expire after 1 hour (security)
+- No backend bandwidth costs
+- Automatic download metrics tracking
+
+### Netlify Scheduled Functions for Cleanup
+**Pattern**: Cron-based serverless function for 48-hour retention
+**Location**: `frontend/src/app/api/cleanup/route.ts`, `netlify.toml`
+
+**Configure Schedule in netlify.toml**:
+```toml
+[functions]
+  directory = ".netlify/functions"
+
+[[functions]]
+  path = "/api/cleanup"
+  schedule = "0 */6 * * *"  # Every 6 hours
+```
+
+**Cleanup API Route**:
+```typescript
+// POST /api/cleanup (triggered by Netlify scheduler)
+export async function POST(request: NextRequest) {
+  const RETENTION_HOURS = 48;
+  const cutoffTime = new Date(Date.now() - RETENTION_HOURS * 60 * 60 * 1000);
+
+  // Query expired slides using Supabase with service role key
+  const { data: expiredSlides } = await supabase
+    .from('slides')
+    .select('id, r2_key')
+    .lt('uploaded_at', cutoffTime.toISOString())
+    .is('deleted_at', null)
+    .not('r2_key', 'is', null);
+
+  // Delete from R2 and mark as deleted in database
+  for (const slide of expiredSlides) {
+    try {
+      await R2.deleteObject(slide.r2_key); // Delete from R2
+      await supabase
+        .from('slides')
+        .update({ deleted_at: new Date() })
+        .eq('id', slide.id); // Soft delete in DB
+    } catch (error) {
+      console.error(`Failed to delete slide ${slide.id}:`, error);
+      // Continue processing other slides
+    }
+  }
+
+  return NextResponse.json({
+    deleted_count: deletedSlides.length,
+    execution_time_ms: Date.now() - startTime,
+  });
+}
+
+// IMPORTANT: Use service role key to bypass RLS
+export const runtime = 'nodejs';
+export const maxDuration = 10; // Allow up to 10 seconds
+```
+
+**Benefits**:
+- Automatic 48-hour retention (no manual cleanup)
+- Runs every 6 hours (configurable)
+- Soft deletes (can restore if needed)
+- Error handling (continues on individual failures)
+- Execution time tracking
+
+### Soft Deletes with deleted_at Column
+**Pattern**: Mark files as deleted instead of hard delete
+**Location**: Database migration 009, cleanup route
+
+```sql
+-- Add soft delete column
+ALTER TABLE slides ADD COLUMN deleted_at TIMESTAMP WITH TIME ZONE;
+
+-- Query active slides (exclude soft-deleted)
+SELECT * FROM slides WHERE deleted_at IS NULL;
+
+-- Soft delete slide
+UPDATE slides SET deleted_at = NOW() WHERE id = 'slide-uuid';
+
+-- Hard delete after retention period (optional)
+DELETE FROM slides WHERE deleted_at < NOW() - INTERVAL '90 days';
+```
+
+**Benefits**:
+- Can restore deleted files if needed
+- Audit trail (when file was deleted)
+- Queries exclude soft-deleted automatically
+- Database cleanup separate from R2 cleanup
+
+### Backward Compatibility with Dual Storage
+**Pattern**: Support both Supabase Storage and R2 in same codebase
+**Location**: Database schema, download route
+
+**Database Schema**:
+```sql
+-- Slide can have either storage_path (old) OR r2_key (new)
+ALTER TABLE slides ALTER COLUMN storage_path DROP NOT NULL;
+ALTER TABLE slides ADD CONSTRAINT slides_storage_location_check
+  CHECK ((storage_path IS NOT NULL) OR (r2_key IS NOT NULL));
+```
+
+**Download Route Logic**:
+```typescript
+// GET /api/slides/:id/download
+const { data: slide } = await supabase
+  .from('slides')
+  .select('storage_path, r2_key')
+  .eq('id', slideId)
+  .single();
+
+// Check which storage system this slide uses
+if (slide.r2_key) {
+  // New: Generate presigned R2 URL
+  const downloadUrl = await R2.generateDownloadUrl(slide.r2_key);
+  return NextResponse.redirect(downloadUrl);
+} else if (slide.storage_path) {
+  // Old: Use Supabase Storage
+  const { data } = await supabase.storage
+    .from('slides')
+    .createSignedUrl(slide.storage_path, 3600);
+  return NextResponse.redirect(data.signedUrl);
+}
+```
+
+**Benefits**:
+- Zero-downtime migration (both systems work)
+- Old slides remain accessible
+- New uploads use R2 automatically
+- Can migrate old slides gradually
+
+### File Validation with Type Guards
+**Pattern**: Client + server file validation
+**Location**: `frontend/src/lib/r2.ts`, upload component
+
+```typescript
+// Allowed MIME types (server-side source of truth)
+export const ALLOWED_MIME_TYPES = [
+  'application/pdf',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+] as const;
+
+export const MAX_FILE_SIZE = 1073741824; // 1GB
+
+// Validation functions
+export function validateFileType(mimeType: string): boolean {
+  return ALLOWED_MIME_TYPES.includes(mimeType as any);
+}
+
+export function validateFileSize(fileSize: number): boolean {
+  return fileSize > 0 && fileSize <= MAX_FILE_SIZE;
+}
+
+// Error messages
+export function getFileTypeError(mimeType: string): string {
+  return `File type "${mimeType}" not allowed. Use: PDF, PPT, PPTX`;
+}
+
+export function getFileSizeError(fileSize: number): string {
+  const sizeMB = (fileSize / (1024 * 1024)).toFixed(2);
+  return `File size ${sizeMB}MB exceeds 1GB limit`;
+}
+```
+
+**Client-side validation** (immediate feedback):
+```typescript
+const handleFileSelect = (file: File) => {
+  if (!R2.validateFileType(file.type)) {
+    setError(R2.getFileTypeError(file.type));
+    return;
+  }
+  if (!R2.validateFileSize(file.size)) {
+    setError(R2.getFileSizeError(file.size));
+    return;
+  }
+  uploadFile(file);
+};
+```
+
+**Server-side validation** (security):
+```typescript
+// API route validates before generating presigned URL
+if (!R2.validateFileType(mimeType)) {
+  return NextResponse.json(
+    { error: R2.getFileTypeError(mimeType) },
+    { status: 400 }
+  );
+}
+```
+
+**Benefits**:
+- Defense in depth (client + server)
+- Consistent error messages
+- Type-safe MIME type checks
+- Human-readable size errors
+
+### Next.js Runtime Configuration
+**Pattern**: Configure Next.js API routes for R2 operations
+**Location**: All `frontend/src/app/api/*/route.ts` files
+
+```typescript
+// Export runtime configuration at end of route file
+
+// Use Node.js runtime (required for AWS SDK)
+export const runtime = 'nodejs'; // Not 'edge'
+
+// Set max duration for long operations (cleanup, large uploads)
+export const maxDuration = 10; // 10 seconds (default is 5)
+
+// For quick operations (presigned URL generation)
+export const maxDuration = 5; // 5 seconds
+```
+
+**Why Node.js runtime:**
+- AWS SDK requires Node.js APIs (not available in Edge runtime)
+- R2 operations need full Node.js crypto support
+- Supabase client works best with Node.js runtime
+
+**Why maxDuration matters:**
+- Cleanup may process many slides (needs 10s)
+- Presigned URL generation is fast (5s is enough)
+- Netlify free tier allows up to 10s per function
+
+**Benefits**: Prevents timeouts, optimizes for operation type
+
+## R2 Troubleshooting Patterns
+
+### R2 Connection Errors
+**Pattern**: Test script for validating R2 credentials
+**Location**: `frontend/test-r2-config.js`
+
+```javascript
+// Quick test to verify R2 configuration
+const { S3Client, ListObjectsV2Command } = require('@aws-sdk/client-s3');
+
+const testR2Config = async () => {
+  const r2Client = new S3Client({
+    region: 'auto',
+    endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+    credentials: {
+      accessKeyId: process.env.R2_ACCESS_KEY_ID,
+      secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
+    },
+  });
+
+  const command = new ListObjectsV2Command({
+    Bucket: process.env.R2_BUCKET_NAME,
+    MaxKeys: 1,
+  });
+
+  await r2Client.send(command);
+  console.log('✅ R2 connection successful!');
+};
+```
+
+**Common Errors:**
+- `NoSuchBucket` → Bucket name wrong or doesn't exist
+- `InvalidAccessKeyId` → Access key is invalid
+- `SignatureDoesNotMatch` → Secret key is wrong
+- `getaddrinfo ENOTFOUND` → Account ID is wrong
+
+**Benefits**: Quick validation before deployment
+
+### CORS Configuration for R2
+**Pattern**: Allow direct client uploads from browser
+**Location**: Cloudflare Dashboard → R2 → Bucket Settings
+
+```json
+[
+  {
+    "AllowedOrigins": [
+      "https://your-app.netlify.app",
+      "http://localhost:3000"
+    ],
+    "AllowedMethods": ["GET", "PUT", "POST", "DELETE", "HEAD"],
+    "AllowedHeaders": ["*"],
+    "ExposeHeaders": ["ETag", "Content-Length"],
+    "MaxAgeSeconds": 3600
+  }
+]
+```
+
+**IMPORTANT**:
+- Add production domain (Netlify URL)
+- Add localhost for development
+- Must include `PUT` for uploads
+- `DELETE` needed for cleanup function
+
+**Benefits**: Prevents CORS errors on upload/download
+
 <!-- MANUAL ADDITIONS END -->

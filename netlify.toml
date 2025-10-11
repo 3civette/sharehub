@@ -37,7 +37,31 @@
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
 
-# Environment variables needed (set in Netlify dashboard):
-# - NEXT_PUBLIC_SUPABASE_URL
-# - NEXT_PUBLIC_SUPABASE_ANON_KEY
-# - NEXT_PUBLIC_API_URL (URL of deployed backend)
+# ============================================================================
+# Scheduled Functions Configuration
+# ============================================================================
+# Feature 008: R2 Storage - Automated cleanup of expired slides
+
+[[functions]]
+  # Cleanup function runs every 6 hours
+  path = "/api/cleanup"
+  schedule = "0 */6 * * *"  # Cron: At minute 0 past every 6th hour
+
+# ============================================================================
+# Environment Variables Configuration Template
+# ============================================================================
+# Set these in Netlify Dashboard → Site Settings → Environment Variables
+
+# Supabase Configuration
+# - NEXT_PUBLIC_SUPABASE_URL          # Your Supabase project URL
+# - NEXT_PUBLIC_SUPABASE_ANON_KEY     # Supabase anonymous key (public)
+# - SUPABASE_SERVICE_ROLE_KEY         # Supabase service role key (secret, for cleanup function)
+
+# Cloudflare R2 Configuration (Feature 008)
+# - R2_ACCOUNT_ID                     # Cloudflare account ID
+# - R2_ACCESS_KEY_ID                  # R2 access key ID (secret)
+# - R2_SECRET_ACCESS_KEY              # R2 secret access key (secret)
+# - R2_BUCKET_NAME                    # R2 bucket name (default: sharehub-slides)
+
+# Legacy Backend (to be removed after Phase 3.9)
+# - NEXT_PUBLIC_API_URL               # URL of deployed backend (deprecated)
