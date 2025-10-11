@@ -1,0 +1,33 @@
+# Fly.io configuration for ShareHub Backend
+# See https://fly.io/docs/reference/configuration/ for full reference
+
+app = "sharehub-backend"
+primary_region = "ams" # Amsterdam - closest to Italy
+
+[build]
+  # Use Dockerfile in backend directory
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8080"
+  NODE_ENV = "production"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["app"]
+
+  [[http_service.checks]]
+    grace_period = "10s"
+    interval = "30s"
+    method = "GET"
+    timeout = "5s"
+    path = "/health"
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 256
