@@ -8,7 +8,7 @@
   # Build command
   command = "npm run build"
 
-  # Output directory (Next.js builds to .next)
+  # Output directory - Netlify handles Next.js automatically
   publish = ".next"
 
 [build.environment]
@@ -18,11 +18,9 @@
   # Next.js specific
   NEXT_TELEMETRY_DISABLED = "1"
 
-# Redirect rules for Next.js
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
+# Next.js Plugin for automatic optimization
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
 
 # Headers for security and performance
 [[headers]]
