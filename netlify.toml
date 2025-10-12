@@ -41,11 +41,11 @@
 # Scheduled Functions Configuration
 # ============================================================================
 # Feature 008: R2 Storage - Automated cleanup of expired slides
-
-[[functions]]
-  # Cleanup function runs every 6 hours
-  path = "/api/cleanup"
-  schedule = "0 */6 * * *"  # Cron: At minute 0 past every 6th hour
+# NOTE: Scheduled functions are configured in Netlify Dashboard UI, not here
+# 1. Go to Netlify Dashboard → Site → Functions
+# 2. Select the cleanup function
+# 3. Add schedule: "0 */6 * * *" (every 6 hours)
+# 4. Or use: netlify functions:schedule api-cleanup "0 */6 * * *"
 
 # ============================================================================
 # Environment Variables Configuration Template
