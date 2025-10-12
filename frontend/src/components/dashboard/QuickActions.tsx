@@ -9,7 +9,7 @@ export default function QuickActions() {
       <h3 className="text-lg font-semibold text-brandBlack dark:text-white mb-4">Azioni Rapide</h3>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Link
-          href="/admin/events/create"
+          href="/admin/events/new"
           className="flex items-center gap-3 p-4 rounded-lg border-2 border-primary/20 dark:border-primary/30 bg-primary/5 dark:bg-primary/10 hover:bg-primary/10 dark:hover:bg-primary/20 hover:border-primary/30 dark:hover:border-primary active:scale-95 transition-all duration-200 group"
         >
           <div className="p-2 bg-primary text-white rounded-lg group-hover:scale-110 transition-transform shadow-button">
@@ -29,8 +29,8 @@ export default function QuickActions() {
             <Palette className="w-6 h-6" />
           </div>
           <div>
-            <p className="font-semibold text-brandBlack dark:text-white">Personalizza Branding</p>
-            <p className="text-sm text-brandInk/70 dark:text-[#E5E7EB]">Colori, logo e pubblicità</p>
+            <p className="font-semibold text-brandBlack dark:text-white">Pubblicità</p>
+            <p className="text-sm text-brandInk/70 dark:text-[#E5E7EB]">Gestisci annunci e sponsor</p>
           </div>
         </Link>
 

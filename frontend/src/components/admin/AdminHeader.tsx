@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { Home } from 'lucide-react';
+import { useTenant } from '@/contexts/TenantContext';
 
 interface AdminHeaderProps {
   title: string;
@@ -14,15 +14,7 @@ interface AdminHeaderProps {
 export default function AdminHeader({ title, subtitle, actions }: AdminHeaderProps) {
   const router = useRouter();
   const supabase = createClientComponentClient();
-  const [userEmail, setUserEmail] = useState<string>('');
-
-  useEffect(() => {
-    const getUserEmail = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      setUserEmail(user?.email || '');
-    };
-    getUserEmail();
-  }, [supabase]);
+  const { tenant } = useTenant();
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -41,12 +33,12 @@ export default function AdminHeader({ title, subtitle, actions }: AdminHeaderPro
             )}
           </div>
 
-          {/* Right: User email + Actions + Dashboard + Logout */}
+          {/* Right: Hotel name + Actions + Dashboard + Logout */}
           <div className="flex items-center gap-3">
-            {/* User email */}
-            {userEmail && (
-              <span className="text-sm text-gray-600 dark:text-[#E5E7EB]">
-                Loggato come: <span className="font-semibold text-[#111827] dark:text-white">{userEmail}</span>
+            {/* Hotel name */}
+            {tenant?.hotel_name && (
+              <span className="text-base font-semibold text-[#111827] dark:text-white">
+                {tenant.hotel_name}
               </span>
             )}
 

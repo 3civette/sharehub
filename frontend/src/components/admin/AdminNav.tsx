@@ -36,7 +36,7 @@ export default function AdminNav() {
       icon: <Plus className="w-5 h-5" />
     },
     {
-      label: 'Branding',
+      label: 'Pubblicità',
       href: '/admin/branding',
       icon: <Palette className="w-5 h-5" />
     },
