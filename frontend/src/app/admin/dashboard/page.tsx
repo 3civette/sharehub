@@ -68,13 +68,35 @@ export default function DashboardPage() {
 
         setTenantId(adminData.tenant_id);
 
-        // Fetch dashboard metrics
-        const metricsResponse = await fetch(`http://localhost:3001/dashboard/metrics/${adminData.tenant_id}`);
-        if (!metricsResponse.ok) {
-          throw new Error('Errore nel caricamento delle metriche');
+        // Fetch dashboard metrics from Supabase
+        // Count active events
+        const { count: activeEventsCount, error: countError } = await supabase
+          .from('events')
+          .select('*', { count: 'exact', head: true })
+          .eq('tenant_id', adminData.tenant_id)
+          .in('status', ['upcoming', 'ongoing']);
+
+        if (countError) {
+          console.error('Error counting active events:', countError);
         }
-        const metricsData = await metricsResponse.json();
-        setMetrics(metricsData);
+
+        // Get last activity timestamp
+        const { data: lastActivity, error: activityError } = await supabase
+          .from('activity_logs')
+          .select('timestamp')
+          .eq('tenant_id', adminData.tenant_id)
+          .order('timestamp', { ascending: false })
+          .limit(1)
+          .single();
+
+        if (activityError && activityError.code !== 'PGRST116') {
+          console.error('Error fetching last activity:', activityError);
+        }
+
+        setMetrics({
+          active_events_count: activeEventsCount || 0,
+          last_activity_at: lastActivity?.timestamp || null
+        });
 
         // Fetch upcoming events (status: upcoming, sorted by date)
         const { data: eventsData, error: eventsError } = await supabase
