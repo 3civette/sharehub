@@ -46,12 +46,12 @@ export default function SlideList({
     <div className="space-y-4">
       {/* Enriched metadata header */}
       {(speechTitle || speakerName) && (
-        <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+        <div className="p-3 bg-blue-900/20 border border-blue-200 rounded-lg">
           {speechTitle && (
-            <p className="text-sm font-semibold text-gray-900">{speechTitle}</p>
+            <p className="text-sm font-semibold text-gray-100">{speechTitle}</p>
           )}
           {speakerName && (
-            <p className="text-xs text-gray-600 mt-1">Speaker: {speakerName}</p>
+            <p className="text-xs text-gray-400 mt-1">Speaker: {speakerName}</p>
           )}
         </div>
       )}
@@ -67,7 +67,7 @@ export default function SlideList({
       {showBatchDownload && slides.length > 1 && speechId && (
         <button
           onClick={handleDownloadAll}
-          className="w-full px-4 py-2 text-sm font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
+          className="w-full px-4 py-2 text-sm font-medium text-blue-700 bg-blue-900/20 border border-blue-200 rounded-md hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
         >
           <svg
             className="w-4 h-4 inline mr-2"

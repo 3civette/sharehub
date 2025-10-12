@@ -49,25 +49,25 @@ export default function HomePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800">
       {/* Header */}
-      <header className="bg-white shadow-sm">
+      <header className="bg-gray-800 shadow-sm border-b border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
             {tenant?.branding?.logo_url && (
               <img src={tenant.branding.logo_url} alt="Logo" className="h-10" />
             )}
-            <h1 className="text-2xl font-bold text-gray-900">{tenant?.hotel_name || 'ShareHub'}</h1>
+            <h1 className="text-2xl font-bold text-gray-100">{tenant?.hotel_name || 'ShareHub'}</h1>
           </div>
           <div className="flex items-center gap-4">
             {isAuthenticated && userEmail && (
-              <span className="text-sm text-gray-600">
-                Loggato come: <span className="font-semibold text-gray-900">{userEmail}</span>
+              <span className="text-sm text-gray-400">
+                Loggato come: <span className="font-semibold text-gray-100">{userEmail}</span>
               </span>
             )}
             <Link
               href="/admin/branding"
-              className="text-sm text-gray-600 hover:text-primary transition-colors"
+              className="text-sm text-gray-400 hover:text-primary transition-colors"
             >
               Pannello Admin
             </Link>
@@ -78,10 +78,10 @@ export default function HomePage() {
       {/* Hero Section */}
       <section className="py-20 px-4">
         <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-5xl font-bold text-gray-900 mb-6">
+          <h2 className="text-5xl font-bold text-gray-100 mb-6">
             Benvenuto in {tenant?.hotel_name || 'ShareHub'}
           </h2>
-          <p className="text-xl text-gray-600 mb-12">
+          <p className="text-xl text-gray-400 mb-12">
             Accedi alle presentazioni degli eventi, scarica le slide e rimani aggiornato sui nostri contenuti.
           </p>
 
@@ -90,7 +90,7 @@ export default function HomePage() {
               <>
                 <Link
                   href="/admin/dashboard"
-                  className="px-8 py-4 bg-primary text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors shadow-lg hover:shadow-xl"
+                  className="px-8 py-4 bg-primary text-gray-900 font-bold rounded-lg hover:bg-yellow-500 transition-colors shadow-lg hover:shadow-xl"
                 >
                   Dashboard
                 </Link>
@@ -99,7 +99,7 @@ export default function HomePage() {
                     await supabase.auth.signOut();
                     router.refresh();
                   }}
-                  className="px-8 py-4 bg-white text-gray-700 border-2 border-gray-300 rounded-lg font-semibold hover:bg-gray-50 transition-colors shadow-lg hover:shadow-xl"
+                  className="px-8 py-4 bg-gray-700 text-gray-100 border-2 border-gray-600 rounded-lg font-semibold hover:bg-gray-600 transition-colors shadow-lg hover:shadow-xl"
                 >
                   Esci
                 </button>
@@ -107,7 +107,7 @@ export default function HomePage() {
             ) : (
               <Link
                 href="/login?redirect=/admin/dashboard"
-                className="px-8 py-4 bg-primary text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors shadow-lg hover:shadow-xl"
+                className="px-8 py-4 bg-primary text-gray-900 font-bold rounded-lg hover:bg-yellow-500 transition-colors shadow-lg hover:shadow-xl"
               >
                 Accedi
               </Link>
@@ -117,9 +117,9 @@ export default function HomePage() {
       </section>
 
       {/* Features */}
-      <section className="py-16 px-4 bg-white">
+      <section className="py-16 px-4 bg-gray-800/50">
         <div className="max-w-6xl mx-auto">
-          <h3 className="text-3xl font-bold text-center text-gray-900 mb-12">
+          <h3 className="text-3xl font-bold text-center text-gray-100 mb-12">
             Funzionalità della Piattaforma
           </h3>
           <div className="grid md:grid-cols-3 gap-8">
@@ -156,10 +156,10 @@ export default function HomePage() {
 
 function FeatureCard({ icon, title, description }: { icon: string; title: string; description: string }) {
   return (
-    <div className="p-6 rounded-lg border border-gray-200 hover:border-primary hover:shadow-lg transition-all">
+    <div className="p-6 rounded-lg bg-gray-800 border border-gray-700 hover:border-primary hover:shadow-lg transition-all">
       <div className="text-4xl mb-4">{icon}</div>
-      <h4 className="text-xl font-semibold text-gray-900 mb-2">{title}</h4>
-      <p className="text-gray-600">{description}</p>
+      <h4 className="text-xl font-semibold text-gray-100 mb-2">{title}</h4>
+      <p className="text-gray-400">{description}</p>
     </div>
   );
 }

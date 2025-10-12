@@ -50,10 +50,10 @@ export default function TokenForm({ slug, onSuccess }: TokenFormProps) {
   };
 
   return (
-    <div className="max-w-md mx-auto mt-12 p-6 bg-white rounded-lg shadow-md border border-gray-200">
+    <div className="max-w-md mx-auto mt-12 p-6 bg-gray-800 rounded-lg shadow-md border border-gray-700">
       <div className="mb-4">
-        <h2 className="text-xl font-semibold text-gray-900">Private Event</h2>
-        <p className="mt-1 text-sm text-gray-600">
+        <h2 className="text-xl font-semibold text-gray-100">Private Event</h2>
+        <p className="mt-1 text-sm text-gray-400">
           This event requires an access token to view. Please enter your token below.
         </p>
       </div>
@@ -62,7 +62,7 @@ export default function TokenForm({ slug, onSuccess }: TokenFormProps) {
         <div>
           <label
             htmlFor="access-token"
-            className="block text-sm font-medium text-gray-700 mb-1"
+            className="block text-sm font-medium text-gray-300 mb-1"
           >
             Access Token
           </label>
@@ -73,7 +73,7 @@ export default function TokenForm({ slug, onSuccess }: TokenFormProps) {
             onChange={(e) => setToken(e.target.value)}
             placeholder="Enter 21-character token"
             maxLength={21}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="w-full px-3 py-2 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             aria-describedby={error ? 'token-error' : undefined}
             disabled={loading}
           />
@@ -85,7 +85,7 @@ export default function TokenForm({ slug, onSuccess }: TokenFormProps) {
         {error && (
           <div
             id="token-error"
-            className="p-3 bg-red-50 border border-red-200 rounded-md"
+            className="p-3 bg-red-900/20 border border-red-200 rounded-md"
             role="alert"
           >
             <p className="text-sm text-red-800">{error}</p>

@@ -81,33 +81,61 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       setLoading(true);
       setError(null);
 
-      const hostname = window.location.hostname;
-      let tenantData;
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
 
-      if (hostname.includes('localhost')) {
-        tenantData = await api.getTenantById('523c2648-f980-4c9e-8e53-93d812cfa79f');
-      } else {
+      const hostname = window.location.hostname;
+      let tenantId = '523c2648-f980-4c9e-8e53-93d812cfa79f'; // Default 3Civette tenant
+
+      // For production, extract subdomain and query by subdomain
+      if (!hostname.includes('localhost') && hostname.includes('.')) {
         const subdomain = hostname.split('.')[0];
-        tenantData = await api.getTenantBySubdomain(subdomain);
+        const { data: tenantBySubdomain, error: subdomainError } = await supabase
+          .from('tenants')
+          .select('*')
+          .eq('subdomain', subdomain)
+          .single();
+
+        if (subdomainError || !tenantBySubdomain) {
+          console.warn('Tenant not found by subdomain, using default');
+        } else {
+          tenantId = tenantBySubdomain.id;
+        }
+      }
+
+      // Fetch tenant by ID
+      const { data: tenantData, error: tenantError } = await supabase
+        .from('tenants')
+        .select('*')
+        .eq('id', tenantId)
+        .single();
+
+      if (tenantError || !tenantData) {
+        throw new Error('Failed to load tenant');
       }
 
       setTenant(tenantData as Tenant);
 
-      // Fetch branding separately
-      try {
-        const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-        const brandingResponse = await fetch(`${API_URL}/branding/${tenantData.id}`);
-        if (brandingResponse.ok) {
-          const brandingData = await brandingResponse.json();
-          setBranding(brandingData);
-          applyBrandingToDOM(brandingData);
-        } else {
-          // No custom branding, apply defaults
-          applyBrandingToDOM(null);
-        }
-      } catch (brandingErr) {
-        console.error('Failed to fetch branding:', brandingErr);
-        // Apply defaults if branding fetch fails
+      // Parse branding from tenant data
+      const brandingData = tenantData.branding_config || tenantData.branding;
+      if (brandingData && typeof brandingData === 'object') {
+        const colors = (brandingData as any).colors || {};
+        const branding: Branding = {
+          id: tenantData.id,
+          tenant_id: tenantData.id,
+          primary_color: colors.primary || '#D4AF37',
+          secondary_color: colors.secondary || '#0B0B0C',
+          logo_url: (brandingData as any).logo_url || null,
+          created_at: tenantData.created_at,
+          updated_at: tenantData.updated_at,
+        };
+        setBranding(branding);
+        applyBrandingToDOM(branding);
+      } else {
+        // Apply defaults
         applyBrandingToDOM(null);
       }
     } catch (err: any) {

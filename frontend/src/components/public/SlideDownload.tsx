@@ -121,11 +121,11 @@ export default function SlideDownload({ slide }: SlideDownloadProps) {
   };
 
   return (
-    <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors">
+    <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg border border-gray-700 hover:bg-gray-700 transition-colors">
       <div className="flex items-center gap-3 flex-1 min-w-0">
         {getFileIcon()}
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-gray-900 truncate">
+          <p className="text-sm font-medium text-gray-100 truncate">
             {slide.filename}
           </p>
           <p className="text-xs text-gray-500">{formatFileSize(slide.file_size)}</p>
@@ -135,7 +135,7 @@ export default function SlideDownload({ slide }: SlideDownloadProps) {
       <button
         onClick={handleDownload}
         disabled={downloading}
-        className="flex-shrink-0 ml-3 px-3 py-1.5 text-sm font-medium text-blue-600 bg-white border border-blue-600 rounded-md hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="flex-shrink-0 ml-3 px-3 py-1.5 text-sm font-medium text-blue-600 bg-gray-800 border border-blue-600 rounded-md hover:bg-blue-900/20 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed"
         aria-label={`Download ${slide.filename}`}
       >
         {downloading ? (
@@ -170,7 +170,7 @@ export default function SlideDownload({ slide }: SlideDownloadProps) {
       </button>
 
       {error && (
-        <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-800">
+        <div className="mt-2 p-2 bg-red-900/20 border border-red-200 rounded text-xs text-red-800">
           {error}
         </div>
       )}

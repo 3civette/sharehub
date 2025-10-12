@@ -29,7 +29,7 @@ export default async function PublicEventPage({ params, searchParams }: PageProp
     const eventData = await fetchPublicEvent(slug, token);
 
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gray-900">
         <div className="max-w-4xl mx-auto px-4 py-8">
           {/* Event Header */}
           <EventHeader event={eventData.event} />
@@ -64,7 +64,7 @@ export default async function PublicEventPage({ params, searchParams }: PageProp
     // Handle 403 - Private event without token
     if (errorMessage.includes('private event') || errorMessage.includes('token')) {
       return (
-        <div className="min-h-screen bg-gray-50">
+        <div className="min-h-screen bg-gray-900">
           <div className="max-w-4xl mx-auto px-4 py-8">
             <TokenForm
               slug={slug}
@@ -85,13 +85,13 @@ export default async function PublicEventPage({ params, searchParams }: PageProp
 
     // Other errors - show error message
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gray-900">
         <div className="max-w-4xl mx-auto px-4 py-8">
-          <div className="bg-red-50 border border-red-200 rounded-lg p-6">
-            <h2 className="text-xl font-semibold text-red-900 mb-2">
+          <div className="bg-red-900/20 border border-red-800 rounded-lg p-6">
+            <h2 className="text-xl font-semibold text-red-100 mb-2">
               Error Loading Event
             </h2>
-            <p className="text-red-700">{errorMessage}</p>
+            <p className="text-red-200">{errorMessage}</p>
           </div>
         </div>
       </div>

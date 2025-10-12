@@ -64,16 +64,16 @@ export default function SessionList({ sessions }: SessionListProps) {
         const totalSlides = getTotalSlides(session.speeches);
 
         return (
-          <section key={session.id} className="border-b border-gray-200 pb-8 last:border-0">
+          <section key={session.id} className="border-b border-gray-700 pb-8 last:border-0">
             {/* Session header */}
             <div className="mb-4">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1">
-                  <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                  <h2 className="text-2xl font-bold text-gray-100 mb-2">
                     {session.title}
                   </h2>
                   {session.scheduled_time && (
-                    <p className="text-sm text-gray-600">
+                    <p className="text-sm text-gray-400">
                       <svg
                         className="w-4 h-4 inline mr-1"
                         fill="none"
@@ -96,7 +96,7 @@ export default function SessionList({ sessions }: SessionListProps) {
                 {totalSlides > 0 && (
                   <button
                     onClick={() => handleDownloadSessionZip(session.id)}
-                    className="flex-shrink-0 px-4 py-2 text-sm font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
+                    className="flex-shrink-0 px-4 py-2 text-sm font-medium text-blue-700 bg-blue-900/20 border border-blue-200 rounded-md hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
                   >
                     <svg
                       className="w-4 h-4 inline mr-1"
@@ -117,7 +117,7 @@ export default function SessionList({ sessions }: SessionListProps) {
               </div>
 
               {session.description && (
-                <p className="mt-2 text-gray-700">{session.description}</p>
+                <p className="mt-2 text-gray-300">{session.description}</p>
               )}
             </div>
 
