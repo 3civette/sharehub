@@ -85,8 +85,8 @@ export default function TokenManager({ tokens, eventId, eventSlug }: TokenManage
     });
   };
 
-  const organizerToken = tokens.find((t) => t.type === 'organizer');
-  const participantToken = tokens.find((t) => t.type === 'participant');
+  const organizerToken = tokens.find((t) => t.token_type === 'single');
+  const participantToken = tokens.find((t) => t.token_type === 'group');
 
   return (
     <div className="bg-white shadow rounded-lg p-6">
@@ -112,7 +112,7 @@ export default function TokenManager({ tokens, eventId, eventSlug }: TokenManage
                 <div className="grid grid-cols-3 gap-4 text-sm text-gray-600">
                   <div>
                     <span className="font-medium">Scadenza:</span>{' '}
-                    {formatDate(organizerToken.expires_at)}
+                    {organizerToken.expires_at ? formatDate(organizerToken.expires_at) : 'Mai'}
                   </div>
                   <div>
                     <span className="font-medium">Utilizzi:</span> {organizerToken.use_count || 0}
@@ -165,7 +165,7 @@ export default function TokenManager({ tokens, eventId, eventSlug }: TokenManage
                 <div className="grid grid-cols-3 gap-4 text-sm text-gray-600">
                   <div>
                     <span className="font-medium">Scadenza:</span>{' '}
-                    {formatDate(participantToken.expires_at)}
+                    {participantToken.expires_at ? formatDate(participantToken.expires_at) : 'Mai'}
                   </div>
                   <div>
                     <span className="font-medium">Utilizzi:</span> {participantToken.use_count || 0}

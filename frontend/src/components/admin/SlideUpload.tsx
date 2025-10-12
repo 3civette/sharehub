@@ -10,10 +10,11 @@ import * as R2 from '@/lib/r2';
 
 interface SlideUploadProps {
   eventId: string;
-  sessionId: string; // Session ID (formerly speechId)
+  speechId: string;
+  accessToken: string;
 }
 
-export default function SlideUpload({ eventId, sessionId }: SlideUploadProps) {
+export default function SlideUpload({ eventId, speechId, accessToken }: SlideUploadProps) {
   const supabase = createClientComponentClient();
   const [slides, setSlides] = useState<Slide[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -33,8 +34,8 @@ export default function SlideUpload({ eventId, sessionId }: SlideUploadProps) {
       // Query slides from Supabase directly (RLS enforces tenant isolation)
       const { data, error: fetchError } = await supabase
         .from('slides')
-        .select('id, filename, file_size, mime_type, display_order, uploaded_at, uploaded_by, r2_key, deleted_at')
-        .eq('session_id', sessionId)
+        .select('id, speech_id, tenant_id, filename, file_size, mime_type, display_order, uploaded_at, uploaded_by, r2_key, deleted_at')
+        .eq('speech_id', speechId)
         .is('deleted_at', null) // Only show non-deleted slides
         .order('display_order', { ascending: true });
 
@@ -129,7 +130,7 @@ export default function SlideUpload({ eventId, sessionId }: SlideUploadProps) {
       // Step 1: Request presigned upload URL from Next.js API
       // -----------------------------------------------------------------------
       const uploadRequest: SlideUploadRequest = {
-        session_id: sessionId,
+        speech_id: speechId,
         filename: selectedFile.name,
         file_size: selectedFile.size,
         mime_type: selectedFile.type,
@@ -194,20 +195,9 @@ export default function SlideUpload({ eventId, sessionId }: SlideUploadProps) {
       // -----------------------------------------------------------------------
       setUploadProgress(100);
 
-      // Create new slide object for immediate UI update
-      const newSlide: Slide = {
-        id: uploadData.slide_id,
-        filename: selectedFile.name,
-        file_size: selectedFile.size,
-        mime_type: selectedFile.type,
-        display_order: slides.length,
-        uploaded_at: new Date().toISOString(),
-        uploaded_by: 'current-user',
-        r2_key: uploadData.r2_key,
-        deleted_at: null,
-      };
+      // Refresh slides list from database to get complete data
+      await fetchSlides();
 
-      setSlides([...slides, newSlide]);
       setSelectedFile(null);
 
       // Reset file input

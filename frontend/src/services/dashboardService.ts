@@ -19,8 +19,9 @@ interface Speech {
   session_id: string;
   event_id: string;
   title: string;
-  speaker: string;
+  speaker_name: string;
   description: string | null;
+  duration: number | null;
   slide_count: number;
   session: {
     title: string;

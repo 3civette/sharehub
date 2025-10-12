@@ -9,7 +9,7 @@
 // Core Slide Type
 // =============================================================================
 
-export interface Slide {
+interface Slide {
   // Identity
   id: string;
   speech_id: string;
@@ -45,8 +45,8 @@ export interface Slide {
 /**
  * Input for requesting presigned upload URL
  */
-export interface SlideUploadRequest {
-  session_id: string;
+interface SlideUploadRequest {
+  speech_id: string;
   filename: string;
   file_size: number;
   mime_type: string;
@@ -55,7 +55,7 @@ export interface SlideUploadRequest {
 /**
  * Response from presigned upload URL generation
  */
-export interface SlideUploadResponse {
+interface SlideUploadResponse {
   upload_url: string; // Presigned R2 URL (valid 1 hour)
   slide_id: string; // UUID of created metadata record
   r2_key: string; // R2 object key
@@ -65,7 +65,7 @@ export interface SlideUploadResponse {
 /**
  * Response from presigned download URL generation
  */
-export interface SlideDownloadResponse {
+interface SlideDownloadResponse {
   download_url: string; // Presigned R2 URL (valid 1 hour)
   filename: string;
   file_size: number;
@@ -81,7 +81,7 @@ export interface SlideDownloadResponse {
  * Slide metadata without download URL
  * Used for listing slides
  */
-export interface SlideMetadata {
+interface SlideMetadata {
   id: string;
   session_id: string;
   filename: string;
@@ -100,7 +100,7 @@ export interface SlideMetadata {
  * Slide with joined metadata from speeches/sessions/events
  * Matches slides_with_metadata database view
  */
-export interface SlideWithMetadata extends Slide {
+interface SlideWithMetadata extends Slide {
   speech_title?: string | null;
   speaker_name?: string | null;
   session_title?: string | null;
@@ -116,7 +116,7 @@ export interface SlideWithMetadata extends Slide {
 /**
  * Response from cleanup job
  */
-export interface CleanupResponse {
+interface CleanupResponse {
   deleted_count: number;
   processed_count: number;
   errors: CleanupError[];
@@ -127,7 +127,7 @@ export interface CleanupResponse {
 /**
  * Error details from cleanup job
  */
-export interface CleanupError {
+interface CleanupError {
   slide_id: string;
   r2_key: string;
   error: string;
@@ -137,7 +137,7 @@ export interface CleanupError {
 // Validation Constants
 // =============================================================================
 
-export const SLIDE_CONSTANTS = {
+const SLIDE_CONSTANTS = {
   // File size limits
   MAX_FILE_SIZE: 1073741824, // 1GB in bytes
   MAX_FILE_SIZE_MB: 1024,
@@ -165,35 +165,35 @@ export const SLIDE_CONSTANTS = {
 /**
  * Check if slide uses R2 storage
  */
-export function isR2Slide(slide: Slide): boolean {
+function isR2Slide(slide: Slide): boolean {
   return slide.r2_key !== null && slide.r2_key !== undefined;
 }
 
 /**
  * Check if slide uses legacy Supabase storage
  */
-export function isLegacySlide(slide: Slide): boolean {
+function isLegacySlide(slide: Slide): boolean {
   return slide.storage_path !== null && slide.storage_path !== undefined;
 }
 
 /**
  * Check if slide is soft-deleted
  */
-export function isDeletedSlide(slide: Slide): boolean {
+function isDeletedSlide(slide: Slide): boolean {
   return slide.deleted_at !== null && slide.deleted_at !== undefined;
 }
 
 /**
  * Check if slide is active (not deleted)
  */
-export function isActiveSlide(slide: Slide): boolean {
+function isActiveSlide(slide: Slide): boolean {
   return !isDeletedSlide(slide);
 }
 
 /**
  * Check if slide is eligible for cleanup (older than 48 hours)
  */
-export function isExpiredSlide(slide: Slide): boolean {
+function isExpiredSlide(slide: Slide): boolean {
   if (!isActiveSlide(slide) || !isR2Slide(slide)) {
     return false;
   }
@@ -210,7 +210,7 @@ export function isExpiredSlide(slide: Slide): boolean {
 /**
  * Get human-readable file size
  */
-export function formatFileSize(bytes: number): string {
+function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(2)} KB`;
   if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
@@ -220,7 +220,7 @@ export function formatFileSize(bytes: number): string {
 /**
  * Get storage type display name
  */
-export function getStorageType(slide: Slide): 'R2' | 'Supabase Storage' | 'Unknown' {
+function getStorageType(slide: Slide): 'R2' | 'Supabase Storage' | 'Unknown' {
   if (isR2Slide(slide)) return 'R2';
   if (isLegacySlide(slide)) return 'Supabase Storage';
   return 'Unknown';
@@ -229,7 +229,7 @@ export function getStorageType(slide: Slide): 'R2' | 'Supabase Storage' | 'Unkno
 /**
  * Get time until slide expires
  */
-export function getTimeUntilExpiry(slide: Slide): number {
+function getTimeUntilExpiry(slide: Slide): number {
   const uploadedAt = new Date(slide.uploaded_at).getTime();
   const expiryTime = uploadedAt + SLIDE_CONSTANTS.RETENTION_HOURS * 60 * 60 * 1000;
   return Math.max(0, expiryTime - Date.now());
@@ -238,7 +238,7 @@ export function getTimeUntilExpiry(slide: Slide): number {
 /**
  * Format time remaining until expiry
  */
-export function formatTimeUntilExpiry(slide: Slide): string {
+function formatTimeUntilExpiry(slide: Slide): string {
   const ms = getTimeUntilExpiry(slide);
   const hours = Math.floor(ms / (60 * 60 * 1000));
   const minutes = Math.floor((ms % (60 * 60 * 1000)) / (60 * 1000));

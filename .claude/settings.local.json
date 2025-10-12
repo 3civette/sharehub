@@ -84,7 +84,22 @@
       "Bash(fly version:*)",
       "Bash(dir:*)",
       "mcp__supabase__apply_migration",
-      "Bash(del backendfly.toml backendDockerfile)"
+      "Bash(del backendfly.toml backendDockerfile)",
+      "Bash(netlify sites:list:*)",
+      "Read(//c/Users/KreshOS/.config/**)",
+      "Bash(export NETLIFY_PERSONAL_ACCESS_TOKEN=\"nfp_Xc2iwUHoSdXLMSVWGAFW1njgV1oHtyCg005f\")",
+      "Bash(netlify status:*)",
+      "Bash(netlify link:*)",
+      "Bash(netlify deploy:list:*)",
+      "Bash(netlify api listSiteDeploys:*)",
+      "Bash(netlify api:*)",
+      "Bash(netlify env:set:*)",
+      "Bash(netlify deploy:*)",
+      "Bash(tasklist)",
+      "Bash(npx tsx:*)",
+      "Bash(del nul)",
+      "mcp__chrome-devtools__resize_page",
+      "mcp__netlify__netlify-deploy-services-updater"
     ],
     "deny": [],
     "ask": []

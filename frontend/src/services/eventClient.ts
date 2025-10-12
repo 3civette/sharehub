@@ -9,10 +9,19 @@ export interface PublicEventResponse {
     id: string;
     slug: string;
     name: string;
+    title: string;
+    organizer?: string;
     date: string;
     description: string | null;
     status: 'upcoming' | 'past' | 'archived';
     visibility: 'public' | 'private';
+    photos?: {
+      id: string;
+      filename: string;
+      url: string;
+      is_cover: boolean;
+      display_order: number;
+    }[];
   };
   sessions: {
     id: string;

@@ -13,6 +13,8 @@ interface Event {
   id: string;
   tenant_id: string;
   name: string;
+  title: string;
+  organizer?: string;
   date: string;
   slug: string;
   description: string | null;

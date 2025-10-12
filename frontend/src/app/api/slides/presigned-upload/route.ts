@@ -18,7 +18,7 @@ import type { SlideUploadRequest, SlideUploadResponse } from '@/types/slide';
 // =============================================================================
 
 const uploadRequestSchema = z.object({
-  session_id: z.string().uuid({ message: 'session_id must be a valid UUID' }),
+  speech_id: z.string().uuid({ message: 'speech_id must be a valid UUID' }),
   filename: z
     .string()
     .min(1, 'filename is required')
@@ -70,9 +70,9 @@ export async function POST(request: NextRequest) {
     try {
       const rawBody = await request.json();
       body = uploadRequestSchema.parse(rawBody);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
-        const firstError = error.errors[0];
+        const firstError = (error as any).errors[0];
         return NextResponse.json(
           {
             error: 'MISSING_REQUIRED_FIELD',
@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { session_id, filename, file_size, mime_type } = body;
+    const { speech_id, filename, file_size, mime_type } = body;
 
     // -------------------------------------------------------------------------
     // Step 3: Additional validation
@@ -119,27 +119,29 @@ export async function POST(request: NextRequest) {
     }
 
     // -------------------------------------------------------------------------
-    // Step 4: Verify session exists and belongs to user's tenant (via RLS)
+    // Step 4: Verify speech exists and belongs to user's tenant (via RLS)
     // -------------------------------------------------------------------------
     // RLS policies automatically enforce tenant isolation
-    const { data: sessionData, error: sessionError } = await supabase
-      .from('sessions')
-      .select('id, event_id, tenant_id')
-      .eq('id', session_id)
+    const { data: speechData, error: speechError } = await supabase
+      .from('speeches')
+      .select('id, session_id, tenant_id, sessions(event_id)')
+      .eq('id', speech_id)
       .single();
 
-    if (sessionError || !sessionData) {
+    if (speechError || !speechData) {
       return NextResponse.json(
         {
-          error: 'INVALID_SESSION',
-          message: 'Session not found or access denied',
-          field: 'session_id',
+          error: 'INVALID_SPEECH',
+          message: 'Speech not found or access denied',
+          field: 'speech_id',
         },
         { status: 400 }
       );
     }
 
-    const { event_id, tenant_id } = sessionData;
+    const session_id = speechData.session_id;
+    const tenant_id = speechData.tenant_id;
+    const event_id = (speechData.sessions as any)?.event_id;
 
     // -------------------------------------------------------------------------
     // Step 5: Generate unique slide ID
@@ -154,10 +156,6 @@ export async function POST(request: NextRequest) {
     // -------------------------------------------------------------------------
     // Step 7: Create slide metadata in database
     // -------------------------------------------------------------------------
-    // Find speech_id if slide is being added to a speech
-    // For now, we'll use null if not provided
-    const speech_id = null; // TODO: Add speech_id to request body if needed
-
     const { data: slide, error: insertError } = await supabase
       .from('slides')
       .insert({
