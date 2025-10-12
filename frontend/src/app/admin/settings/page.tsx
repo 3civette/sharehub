@@ -47,28 +47,18 @@ export default function AdminSettingsPage() {
         throw new Error('Tenant ID not available');
       }
 
-      // Get session token
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
+      // Fetch settings from Supabase
+      const { data, error: fetchError } = await supabase
+        .from('tenants')
+        .select('id, hotel_name, contact_email, contact_phone, billing_info')
+        .eq('id', tenant.id)
+        .single();
 
-      if (!token) {
-        throw new Error('No authentication token available');
-      }
-
-      // Fetch settings from API
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-      const response = await fetch(`${API_URL}/settings/${tenant.id}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
+      if (fetchError) {
         throw new Error('Failed to fetch settings');
       }
 
-      const data = await response.json();
-      setSettings(data);
+      setSettings(data as TenantSettings);
     } catch (err: any) {
       console.error('Error fetching settings:', err);
       setError(err.message || 'Failed to load settings');
@@ -87,32 +77,24 @@ export default function AdminSettingsPage() {
         throw new Error('Tenant ID not available');
       }
 
-      // Get session token
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
+      // Update settings in Supabase
+      const { data: updatedData, error: updateError } = await supabase
+        .from('tenants')
+        .update({
+          hotel_name: data.hotel_name,
+          contact_email: data.contact_email,
+          contact_phone: data.contact_phone,
+          billing_info: data.billing_info
+        })
+        .eq('id', tenant.id)
+        .select('id, hotel_name, contact_email, contact_phone, billing_info')
+        .single();
 
-      if (!token) {
-        throw new Error('No authentication token available');
+      if (updateError) {
+        throw new Error(updateError.message || 'Failed to update settings');
       }
 
-      // Update settings via API
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-      const response = await fetch(`${API_URL}/settings/${tenant.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(data),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Failed to update settings');
-      }
-
-      const updatedSettings = await response.json();
-      setSettings(updatedSettings);
+      setSettings(updatedData as TenantSettings);
 
       // Refetch tenant data to update context
       await refetchTenant();
