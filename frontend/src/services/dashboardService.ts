@@ -15,15 +15,22 @@ interface Session {
   updated_at: string;
 }
 
+interface Slide {
+  id: string;
+  thumbnail_r2_key: string | null;
+  thumbnail_status: 'pending' | 'processing' | 'completed' | 'failed';
+}
+
 interface Speech {
   id: string;
   session_id: string;
-  event_id: string;
   title: string;
   speaker_name: string;
   description: string | null;
-  duration: number | null;
+  duration_minutes: number | null;
   slide_count: number;
+  first_slide_thumbnail: string | null;
+  thumbnail_status: 'pending' | 'processing' | 'completed' | 'failed' | 'none';
   session: {
     title: string;
   };
@@ -105,15 +112,50 @@ export async function fetchDashboardData(
     .eq('event_id', eventId)
     .order('start_time', { ascending: true });
 
-  // Fetch speeches with session info
+  // Fetch speeches with session info and slide count + thumbnail data
   const { data: speeches } = await supabase
     .from('speeches')
     .select(`
       *,
-      session:sessions!inner(title)
+      session:sessions!inner(title),
+      slides(id, thumbnail_r2_key, thumbnail_status)
     `)
     .eq('session.event_id', eventId)
+    .is('slides.deleted_at', null)
     .order('created_at', { ascending: true });
+
+  // Calculate slide count and thumbnail data for each speech
+  const speechesWithSlideCount = speeches?.map(speech => {
+    const slidesArray = speech.slides || [];
+    const slideCount = slidesArray.length;
+
+    // Get first slide with completed thumbnail (if any)
+    const firstSlideWithThumbnail = slidesArray.find(
+      (s: Slide) => s.thumbnail_status === 'completed' && s.thumbnail_r2_key
+    );
+
+    // Determine overall thumbnail status
+    let thumbnailStatus: 'pending' | 'processing' | 'completed' | 'failed' | 'none' = 'none';
+    if (slideCount === 0) {
+      thumbnailStatus = 'none';
+    } else if (slidesArray.some((s: Slide) => s.thumbnail_status === 'processing')) {
+      thumbnailStatus = 'processing';
+    } else if (slidesArray.some((s: Slide) => s.thumbnail_status === 'completed')) {
+      thumbnailStatus = 'completed';
+    } else if (slidesArray.every((s: Slide) => s.thumbnail_status === 'failed')) {
+      thumbnailStatus = 'failed';
+    } else {
+      thumbnailStatus = 'pending';
+    }
+
+    return {
+      ...speech,
+      slide_count: slideCount,
+      first_slide_thumbnail: firstSlideWithThumbnail?.thumbnail_r2_key || null,
+      thumbnail_status: thumbnailStatus,
+      slides: undefined, // Remove slides array from response
+    };
+  }) || [];
 
   // Fetch photos
   const { data: photos } = await supabase
@@ -134,7 +176,7 @@ export async function fetchDashboardData(
     event,
     tokens: tokens || [],
     sessions: sessions || [],
-    speeches: speeches || [],
+    speeches: speechesWithSlideCount,
     photos: photos || [],
     metrics,
   };

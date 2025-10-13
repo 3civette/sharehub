@@ -7,6 +7,7 @@ import { redirect } from 'next/navigation';
 import { fetchDashboardData } from '@/services/dashboardService';
 import EventDashboardOverview from '@/components/admin/EventDashboardOverview';
 import TokenManager from '@/components/admin/TokenManager';
+import DashboardSessionsSpeeches from '@/components/admin/DashboardSessionsSpeeches';
 
 // Disable caching for this page - always fetch fresh data
 export const dynamic = 'force-dynamic';
@@ -65,103 +66,15 @@ export default async function EventDashboardPage({ params }: PageProps) {
               eventSlug={dashboardData.event.slug}
             />
 
-            {/* Sessions & Speeches Summary */}
-            <div className="bg-white dark:bg-gray-900 shadow rounded-lg p-6 border border-gray-200 dark:border-gray-800">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold text-brandBlack">Sessioni e Interventi</h2>
-                <div className="flex gap-2">
-                  <a
-                    href={`/admin/events/${dashboardData.event.id}/sessions`}
-                    className="px-4 py-2 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary/90 transition flex items-center gap-2"
-                  >
-                    <span>+</span>
-                    <span>Sessione</span>
-                  </a>
-                  <a
-                    href={`/admin/events/${dashboardData.event.id}/speeches`}
-                    className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition flex items-center gap-2"
-                  >
-                    <span>+</span>
-                    <span>Intervento</span>
-                  </a>
-                </div>
-              </div>
-              {dashboardData.sessions.length === 0 ? (
-                <p className="text-brandInk/70 text-center py-8">Nessuna sessione programmata</p>
-              ) : (
-                <div className="space-y-4">
-                  {dashboardData.sessions.map((session) => {
-                    const sessionSpeeches = dashboardData.speeches.filter(
-                      (speech) => speech.session_id === session.id
-                    );
-                    return (
-                      <div key={session.id} className="border rounded-lg overflow-hidden">
-                        {/* Session Header */}
-                        <div className="bg-primary/10 p-4">
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <h3 className="font-semibold text-brandBlack text-lg">{session.title}</h3>
-                              <div className="flex flex-wrap gap-3 mt-2 text-sm text-brandInk/70">
-                                <span>🕐 {new Date(session.start_time).toLocaleDateString('it-IT')} {new Date(session.start_time).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}</span>
-                                {session.end_time && (
-                                  <span>→ {new Date(session.end_time).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}</span>
-                                )}
-                                {session.room && <span>📍 {session.room}</span>}
-                              </div>
-                            </div>
-                            <a
-                              href={`/admin/events/${dashboardData.event.id}/sessions?edit=${session.id}`}
-                              className="ml-4 px-3 py-1.5 text-sm font-medium text-primary hover:text-primary/90 hover:bg-primary/10 rounded transition"
-                            >
-                              Modifica
-                            </a>
-                          </div>
-                        </div>
-                        {/* Speeches List */}
-                        {sessionSpeeches.length > 0 ? (
-                          <div className="divide-y">
-                            {sessionSpeeches.map((speech) => (
-                              <div key={speech.id} className="p-4 hover:bg-primary/10 flex items-start justify-between">
-                                <div className="flex-1">
-                                  <h4 className="font-medium text-brandBlack">{speech.title}</h4>
-                                  {speech.speaker_name && (
-                                    <p className="text-sm text-brandInk/70 mt-1">👤 {speech.speaker_name}</p>
-                                  )}
-                                  {speech.duration && (
-                                    <p className="text-sm text-brandInk/70 mt-1">⏱️ {speech.duration} min</p>
-                                  )}
-                                  <p className="text-xs text-brandInk/70 mt-1">
-                                    📄 {speech.slide_count} slide
-                                  </p>
-                                </div>
-                                <div className="flex gap-2 ml-4">
-                                  <a
-                                    href={`/admin/events/${dashboardData.event.id}/speeches/${speech.id}/slides`}
-                                    className="px-3 py-1.5 text-sm font-medium text-purple-600 hover:text-purple-700 hover:bg-purple-50 rounded transition"
-                                  >
-                                    Upload Slide
-                                  </a>
-                                  <a
-                                    href={`/admin/events/${dashboardData.event.id}/speeches?edit=${speech.id}`}
-                                    className="px-3 py-1.5 text-sm font-medium text-green-600 hover:text-green-700 hover:bg-green-50 rounded transition"
-                                  >
-                                    Modifica
-                                  </a>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="p-4 text-sm text-brandInk/70 italic">
-                            Nessun intervento in questa sessione
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
+            {/* Sessions & Speeches Management */}
+            <DashboardSessionsSpeeches
+              eventId={dashboardData.event.id}
+              tenantId={dashboardData.event.tenant_id}
+              eventDate={dashboardData.event.date}
+              sessions={dashboardData.sessions}
+              speeches={dashboardData.speeches}
+              accessToken={session.access_token}
+            />
 
             {/* Event Photos Summary */}
             <div className="bg-white dark:bg-gray-900 shadow rounded-lg p-6 border border-gray-200 dark:border-gray-800">

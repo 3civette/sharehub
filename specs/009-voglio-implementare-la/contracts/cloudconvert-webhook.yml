@@ -1,0 +1,352 @@
+# API Contract: CloudConvert Webhook
+# Feature: 009-voglio-implementare-la
+# Endpoint: POST /api/webhooks/cloudconvert
+# Purpose: Receive CloudConvert job completion notifications and process thumbnail results
+
+openapi: 3.0.0
+info:
+  title: CloudConvert Webhook API
+  version: 1.0.0
+  description: |
+    Receives webhook notifications from CloudConvert API when thumbnail generation jobs complete.
+    Processes the result, downloads the thumbnail, uploads to R2, and updates database.
+
+paths:
+  /api/webhooks/cloudconvert:
+    post:
+      summary: CloudConvert job completion webhook
+      description: |
+        Processes CloudConvert webhook notifications for completed thumbnail generation jobs.
+
+        **Business Logic**:
+        1. Verify webhook signature (CloudConvert HMAC-SHA256)
+        2. Extract job_id and status from webhook payload
+        3. Query cloudconvert_jobs table for job record
+        4. If status = 'finished':
+           a. Download thumbnail from CloudConvert export URL
+           b. Upload thumbnail to R2 (tenant-scoped key)
+           c. Update slides table: thumbnail_status = 'completed', thumbnail_r2_key set
+           d. Update cloudconvert_jobs: status = 'completed', completed_at = NOW()
+        5. If status = 'error':
+           a. Update slides table: thumbnail_status = 'failed'
+           b. Update cloudconvert_jobs: status = 'failed', error_message set
+           c. Create thumbnail_failure_log entry
+           d. Check for 3+ consecutive failures → trigger email notification
+        6. Return 200 OK to acknowledge webhook
+
+        **Security**:
+        - Webhook signature verification required (CLOUDCONVERT_WEBHOOK_SECRET)
+        - No authentication token needed (external service callback)
+        - Idempotency: Duplicate webhooks are safe (status already updated)
+
+        **Error Recovery**:
+        - If download fails: Retry up to 3 times with exponential backoff
+        - If R2 upload fails: Mark as failed, log error
+        - If database update fails: Transaction rollback, return 500
+
+      operationId: cloudConvertWebhook
+      tags:
+        - Webhooks
+        - Thumbnails
+      security:
+        - webhookSignature: []
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - event
+                - job
+              properties:
+                event:
+                  type: string
+                  enum: [job.finished, job.failed]
+                  description: CloudConvert event type
+                  example: "job.finished"
+                job:
+                  type: object
+                  required:
+                    - id
+                    - status
+                  properties:
+                    id:
+                      type: string
+                      description: CloudConvert job ID
+                      example: "cdec4c2c-2e1d-4e88-8c5a-2b1e4d5f6a7b"
+                    status:
+                      type: string
+                      enum: [finished, error]
+                      description: Job completion status
+                      example: "finished"
+                    created_at:
+                      type: string
+                      format: date-time
+                      example: "2025-01-13T10:00:00Z"
+                    finished_at:
+                      type: string
+                      format: date-time
+                      example: "2025-01-13T10:02:15Z"
+                    tasks:
+                      type: array
+                      description: Array of tasks in the job
+                      items:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                          operation:
+                            type: string
+                            example: "convert"
+                          status:
+                            type: string
+                            enum: [finished, error]
+                          result:
+                            type: object
+                            properties:
+                              files:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    filename:
+                                      type: string
+                                      example: "thumbnail.jpg"
+                                    url:
+                                      type: string
+                                      format: uri
+                                      description: Temporary download URL (expires in 24h)
+                                      example: "https://storage.cloudconvert.com/tasks/xyz/thumbnail.jpg?signature=..."
+                          message:
+                            type: string
+                            description: Error message if status = error
+                            example: "Conversion failed: Unsupported format"
+            examples:
+              success:
+                summary: Successful job completion
+                value:
+                  event: "job.finished"
+                  job:
+                    id: "cdec4c2c-2e1d-4e88-8c5a-2b1e4d5f6a7b"
+                    status: "finished"
+                    created_at: "2025-01-13T10:00:00Z"
+                    finished_at: "2025-01-13T10:02:15Z"
+                    tasks:
+                      - id: "task-123"
+                        operation: "convert"
+                        status: "finished"
+                        result:
+                          files:
+                            - filename: "thumbnail.jpg"
+                              url: "https://storage.cloudconvert.com/tasks/xyz/thumbnail.jpg?signature=abc123"
+              failure:
+                summary: Failed job
+                value:
+                  event: "job.failed"
+                  job:
+                    id: "cdec4c2c-2e1d-4e88-8c5a-2b1e4d5f6a7b"
+                    status: "error"
+                    created_at: "2025-01-13T10:00:00Z"
+                    finished_at: "2025-01-13T10:02:15Z"
+                    tasks:
+                      - id: "task-123"
+                        operation: "convert"
+                        status: "error"
+                        message: "Conversion failed: File is corrupted"
+
+      responses:
+        '200':
+          description: Webhook processed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                  - job_id
+                properties:
+                  message:
+                    type: string
+                    example: "Webhook processed successfully"
+                  job_id:
+                    type: string
+                    description: CloudConvert job ID
+                    example: "cdec4c2c-2e1d-4e88-8c5a-2b1e4d5f6a7b"
+                  slide_id:
+                    type: string
+                    format: uuid
+                    description: Associated slide UUID
+                    example: "550e8400-e29b-41d4-a716-446655440000"
+                  thumbnail_status:
+                    type: string
+                    enum: [completed, failed]
+                    example: "completed"
+
+        '400':
+          description: Invalid webhook payload or signature
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - error
+                  - message
+                properties:
+                  error:
+                    type: string
+                    enum:
+                      - INVALID_SIGNATURE
+                      - INVALID_PAYLOAD
+                      - JOB_NOT_FOUND
+                  message:
+                    type: string
+                    example: "Webhook signature verification failed"
+
+        '500':
+          description: Internal server error during webhook processing
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - error
+                  - message
+                properties:
+                  error:
+                    type: string
+                    enum:
+                      - R2_UPLOAD_FAILED
+                      - DATABASE_ERROR
+                      - INTERNAL_SERVER_ERROR
+                  message:
+                    type: string
+                    example: "Failed to upload thumbnail to R2"
+                  job_id:
+                    type: string
+                    description: CloudConvert job ID for debugging
+                    example: "cdec4c2c-2e1d-4e88-8c5a-2b1e4d5f6a7b"
+
+components:
+  securitySchemes:
+    webhookSignature:
+      type: apiKey
+      in: header
+      name: CloudConvert-Signature
+      description: |
+        HMAC-SHA256 signature of the webhook payload.
+        Computed as: HMAC-SHA256(CLOUDCONVERT_WEBHOOK_SECRET, request_body)
+
+# Contract Test Requirements
+x-contract-tests:
+  - name: "Successful webhook processing for finished job"
+    request:
+      signature_valid: true
+      job_status: "finished"
+      job_exists: true
+      cloudconvert_download_succeeds: true
+      r2_upload_succeeds: true
+    expected:
+      status: 200
+      body:
+        thumbnail_status: "completed"
+    postconditions:
+      - slides.thumbnail_status: "completed"
+      - slides.thumbnail_r2_key: "tenants/{tenant_id}/events/{event_id}/slides/{slide_id}-thumb.jpg"
+      - cloudconvert_jobs.status: "completed"
+      - cloudconvert_jobs.completed_at: NOT NULL
+      - cloudconvert_jobs.webhook_received_at: NOT NULL
+
+  - name: "Webhook processing for failed job"
+    request:
+      signature_valid: true
+      job_status: "error"
+      job_exists: true
+    expected:
+      status: 200
+      body:
+        thumbnail_status: "failed"
+    postconditions:
+      - slides.thumbnail_status: "failed"
+      - cloudconvert_jobs.status: "failed"
+      - cloudconvert_jobs.error_message: NOT NULL
+      - thumbnail_failure_log_created: true
+
+  - name: "Invalid webhook signature returns 400"
+    request:
+      signature_valid: false
+    expected:
+      status: 400
+      body:
+        error: "INVALID_SIGNATURE"
+
+  - name: "Job not found in database returns 400"
+    request:
+      signature_valid: true
+      job_exists: false
+    expected:
+      status: 400
+      body:
+        error: "JOB_NOT_FOUND"
+
+  - name: "R2 upload failure marks thumbnail as failed"
+    request:
+      signature_valid: true
+      job_status: "finished"
+      job_exists: true
+      cloudconvert_download_succeeds: true
+      r2_upload_succeeds: false
+    expected:
+      status: 500
+      body:
+        error: "R2_UPLOAD_FAILED"
+    postconditions:
+      - slides.thumbnail_status: "failed"
+      - cloudconvert_jobs.status: "failed"
+      - thumbnail_failure_log_created: true
+
+  - name: "Consecutive failures trigger email notification"
+    request:
+      signature_valid: true
+      job_status: "error"
+      job_exists: true
+      previous_failures_count: 2 # This will be the 3rd
+    expected:
+      status: 200
+    postconditions:
+      - email_notification_sent: true
+      - email_recipient: event admin
+      - email_subject: "Thumbnail Generation Failures Detected"
+
+  - name: "Idempotent webhook processing (duplicate webhook)"
+    request:
+      signature_valid: true
+      job_status: "finished"
+      job_exists: true
+      cloudconvert_jobs.status: "completed" # Already processed
+    expected:
+      status: 200
+      body:
+        message: "Webhook already processed"
+    postconditions:
+      - no_duplicate_r2_upload: true
+      - cloudconvert_jobs.status: "completed" # Unchanged
+
+# Webhook Signature Verification
+x-security-implementation:
+  signature_verification:
+    algorithm: "HMAC-SHA256"
+    secret_source: "process.env.CLOUDCONVERT_WEBHOOK_SECRET"
+    header_name: "CloudConvert-Signature"
+    verification_code: |
+      const crypto = require('crypto');
+      const signature = req.headers['cloudconvert-signature'];
+      const payload = JSON.stringify(req.body);
+      const expectedSignature = crypto
+        .createHmac('sha256', process.env.CLOUDCONVERT_WEBHOOK_SECRET)
+        .update(payload)
+        .digest('hex');
+      if (signature !== expectedSignature) {
+        return res.status(400).json({ error: 'INVALID_SIGNATURE' });
+      }

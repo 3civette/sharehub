@@ -12,6 +12,8 @@ Auto-generated from all feature plans. Last updated: 2025-10-06
 - Supabase PostgreSQL with existing RLS policies (005-ora-facciamo-la)
 - TypeScript 5.3+ (Node.js 20 LTS backend, React 18 frontend) + Next.js 14 App Router, Tailwind CSS 3.x, Lucide React, Supabase Client (007-voglio-che-l)
 - Supabase PostgreSQL (existing schema unchanged), Supabase Storage (for tenant logos) (007-voglio-che-l)
+- TypeScript 5.3+ (Node.js 20 LTS backend, React 18 frontend) + Next.js 14 App Router (frontend), CloudConvert API SDK, Supabase Client, Cloudflare R2 SDK, Email service (for failure notifications) (009-voglio-implementare-la)
+- Supabase PostgreSQL (database), Cloudflare R2 (thumbnail storage), existing slide storage in R2 (009-voglio-implementare-la)
 
 ## Project Structure
 ```
@@ -27,9 +29,9 @@ npm test; npm run lint
 TypeScript 5.3+ (Node.js 20 LTS for backend, React 18 for frontend): Follow standard conventions
 
 ## Recent Changes
+- 009-voglio-implementare-la: Added TypeScript 5.3+ (Node.js 20 LTS backend, React 18 frontend) + Next.js 14 App Router (frontend), CloudConvert API SDK, Supabase Client, Cloudflare R2 SDK, Email service (for failure notifications)
 - 007-voglio-che-l: Added TypeScript 5.3+ (Node.js 20 LTS backend, React 18 frontend) + Next.js 14 App Router, Tailwind CSS 3.x, Lucide React, Supabase Client
 - 005-ora-facciamo-la: Added TypeScript 5.3+ (Node.js 20 LTS backend, React 18 frontend)
-- 004-facciamo-la-pagina: Added TypeScript 5.3+ (Node.js 20 LTS backend, React 18 frontend) + Express.js (backend API), Next.js 14 App Router (frontend), Supabase (database + auth + storage), Tailwind CSS (styling), archiver (ZIP generation)
 
 <!-- MANUAL ADDITIONS START -->
 
@@ -904,5 +906,521 @@ const testR2Config = async () => {
 - `DELETE` needed for cleanup function
 
 **Benefits**: Prevents CORS errors on upload/download
+
+## Feature-Specific Patterns (009-voglio-implementare-la)
+
+### Async Processing with Webhook Architecture
+**Pattern**: Non-blocking thumbnail generation using external API with webhook completion
+**Location**: `frontend/src/services/cloudConvertService.ts`, `/api/webhooks/cloudconvert/route.ts`
+
+**Flow**:
+```
+Client Upload → API Initiate (202 Accepted) → CloudConvert Queue → [2-5 min]
+                                                                      ↓
+                                                            Webhook Callback
+                                                                      ↓
+                                                        Download → Upload to R2 → Update DB → Realtime UI
+```
+
+**Initiation** (`cloudConvertService.ts`):
+```typescript
+export async function initiateThumbnailGeneration({
+  slideId,
+  tenantId,
+  eventId,
+}: GenerateThumbnailParams): Promise<ThumbnailGenerationResult> {
+  // 1. Check and increment quota atomically
+  const quotaResult = await supabase.rpc('check_and_increment_thumbnail_quota', {
+    p_tenant_id: tenantId,
+    p_event_id: eventId,
+  });
+
+  if (!quotaResult.success) {
+    return { success: false, status: 'quota_exhausted', message: 'Quota exhausted' };
+  }
+
+  try {
+    // 2. Generate R2 download URL for CloudConvert
+    const downloadUrl = await generatePresignedDownloadUrl(slide.r2_key, 3600);
+
+    // 3. Create CloudConvert job
+    const job = await cloudConvert.jobs.create({
+      tasks: {
+        import: { operation: 'import/url', url: downloadUrl },
+        convert: {
+          operation: 'convert',
+          input: ['import'],
+          output_format: 'jpg',
+          page_range: '1-1', // First slide only
+        },
+        export: { operation: 'export/url', input: ['convert'] },
+      },
+      webhook_url: `${process.env.NEXT_PUBLIC_API_URL}/api/webhooks/cloudconvert`,
+    });
+
+    // 4. Save job to database
+    await supabase.from('cloudconvert_jobs').insert({
+      cloudconvert_job_id: job.id,
+      slide_id: slideId,
+      tenant_id: tenantId,
+      event_id: eventId,
+      status: 'pending',
+    });
+
+    // 5. Update slide status
+    await supabase.from('slides').update({ thumbnail_status: 'processing' }).eq('id', slideId);
+
+    return { success: true, status: 'processing', job_id: job.id };
+  } catch (error) {
+    // Rollback quota on failure
+    await supabase.rpc('decrement_thumbnail_quota', { p_tenant_id: tenantId });
+    throw error;
+  }
+}
+```
+
+**Webhook Processing** (`/api/webhooks/cloudconvert/route.ts`):
+```typescript
+export async function POST(request: NextRequest) {
+  // 1. Verify webhook signature
+  const signature = request.headers.get('CloudConvert-Signature');
+  const isValid = verifyWebhookSignature(await request.text(), signature);
+
+  if (!isValid) {
+    return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
+  }
+
+  const payload = await request.json();
+
+  // 2. Idempotent check - if webhook already processed, return success
+  const { data: existingJob } = await supabase
+    .from('cloudconvert_jobs')
+    .select('webhook_received_at')
+    .eq('cloudconvert_job_id', payload.job.id)
+    .single();
+
+  if (existingJob?.webhook_received_at) {
+    return NextResponse.json({ message: 'Already processed' }, { status: 200 });
+  }
+
+  // 3. Download thumbnail from CloudConvert
+  const thumbnailUrl = payload.job.tasks.find(t => t.name === 'export').result.files[0].url;
+  const thumbnailBuffer = await fetch(thumbnailUrl).then(r => r.arrayBuffer());
+
+  // 4. Upload to R2
+  const thumbnailKey = `thumbnails/${slideId}.jpg`;
+  await uploadToR2(thumbnailKey, thumbnailBuffer, 'image/jpeg');
+
+  // 5. Update database atomically
+  await supabase.from('slides').update({
+    thumbnail_r2_key: thumbnailKey,
+    thumbnail_status: 'completed',
+    thumbnail_generated_at: new Date(),
+  }).eq('id', slideId);
+
+  await supabase.from('cloudconvert_jobs').update({
+    status: 'completed',
+    webhook_received_at: new Date(),
+    completed_at: new Date(),
+  }).eq('cloudconvert_job_id', payload.job.id);
+
+  return NextResponse.json({ message: 'Processed' }, { status: 200 });
+}
+```
+
+**Benefits**:
+- Non-blocking: Slide upload returns immediately (<1s)
+- Scalable: External API handles processing
+- Reliable: Webhook-based completion (no polling)
+- Idempotent: Safe for duplicate webhooks
+
+### Atomic Quota Management with PostgreSQL Functions
+**Pattern**: Row-level locking with atomic check-and-increment
+**Location**: `supabase/migrations/009_006_create_atomic_quota_functions.sql`
+
+**PostgreSQL Function**:
+```sql
+CREATE OR REPLACE FUNCTION check_and_increment_thumbnail_quota(
+  p_tenant_id UUID,
+  p_event_id UUID
+)
+RETURNS TABLE (
+  success BOOLEAN,
+  quota_used INTEGER,
+  quota_total INTEGER,
+  quota_remaining INTEGER
+) AS $$
+DECLARE
+  v_tenant_quota_used INTEGER;
+  v_tenant_quota_total INTEGER;
+  v_event_enabled BOOLEAN;
+BEGIN
+  -- Check event toggle (no lock needed)
+  SELECT thumbnail_generation_enabled INTO v_event_enabled
+  FROM events
+  WHERE id = p_event_id;
+
+  IF NOT v_event_enabled THEN
+    RETURN QUERY SELECT FALSE, 0, 0, 0;
+    RETURN;
+  END IF;
+
+  -- Lock tenant row and get quota (prevents race conditions)
+  SELECT thumbnail_quota_used, thumbnail_quota_total
+  INTO v_tenant_quota_used, v_tenant_quota_total
+  FROM tenants
+  WHERE id = p_tenant_id
+  FOR UPDATE; -- Row-level lock
+
+  -- Check if quota available
+  IF v_tenant_quota_used >= v_tenant_quota_total THEN
+    RETURN QUERY SELECT
+      FALSE,
+      v_tenant_quota_used,
+      v_tenant_quota_total,
+      (v_tenant_quota_total - v_tenant_quota_used);
+    RETURN;
+  END IF;
+
+  -- Increment quota (within same transaction)
+  UPDATE tenants
+  SET thumbnail_quota_used = thumbnail_quota_used + 1
+  WHERE id = p_tenant_id;
+
+  -- Return success with updated quota
+  RETURN QUERY SELECT
+    TRUE,
+    v_tenant_quota_used + 1,
+    v_tenant_quota_total,
+    (v_tenant_quota_total - v_tenant_quota_used - 1);
+END;
+$$ LANGUAGE plpgsql;
+```
+
+**Usage in Service**:
+```typescript
+const { data: quotaResult } = await supabase.rpc('check_and_increment_thumbnail_quota', {
+  p_tenant_id: tenantId,
+  p_event_id: eventId,
+});
+
+if (!quotaResult.success) {
+  return res.status(403).json({
+    error: 'QUOTA_EXHAUSTED',
+    quota: {
+      used: quotaResult.quota_used,
+      total: quotaResult.quota_total,
+      remaining: quotaResult.quota_remaining,
+    },
+  });
+}
+```
+
+**Benefits**:
+- Prevents race conditions (multiple concurrent requests)
+- Atomic operation (check + increment in single transaction)
+- Row-level locking (only blocks same tenant)
+- Returns updated quota in single call
+
+### Webhook Signature Verification (HMAC-SHA256)
+**Pattern**: Verify webhook authenticity using cryptographic signatures
+**Location**: `frontend/src/services/cloudConvertService.ts:verifyWebhookSignature()`
+
+```typescript
+import { createHmac } from 'crypto';
+
+export function verifyWebhookSignature(
+  payload: string,
+  receivedSignature: string | null
+): boolean {
+  if (!receivedSignature) {
+    console.error('[CloudConvert] No signature provided');
+    return false;
+  }
+
+  const webhookSecret = process.env.CLOUDCONVERT_WEBHOOK_SECRET;
+  if (!webhookSecret) {
+    throw new Error('CLOUDCONVERT_WEBHOOK_SECRET not configured');
+  }
+
+  // Compute HMAC-SHA256 signature
+  const computedSignature = createHmac('sha256', webhookSecret)
+    .update(payload)
+    .digest('hex');
+
+  // Constant-time comparison (prevents timing attacks)
+  return computedSignature === receivedSignature;
+}
+```
+
+**Webhook Route Usage**:
+```typescript
+export async function POST(request: NextRequest) {
+  const rawBody = await request.text();
+  const signature = request.headers.get('CloudConvert-Signature');
+
+  if (!verifyWebhookSignature(rawBody, signature)) {
+    console.error('[Webhook] Signature verification failed');
+    return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
+  }
+
+  // Process webhook...
+}
+```
+
+**Benefits**:
+- Prevents unauthorized webhook calls
+- Protects against replay attacks
+- Industry-standard cryptographic verification
+- Constant-time comparison prevents timing attacks
+
+### Real-time UI Updates with Supabase Realtime
+**Pattern**: Subscribe to database changes for live progress updates
+**Location**: `frontend/src/hooks/useThumbnailProgress.ts`
+
+**Hook Implementation**:
+```typescript
+export function useThumbnailProgress(options: UseThumbnailProgressOptions = {}) {
+  const { eventId, onUpdate, debug = false } = options;
+  const supabaseRef = useRef(createClientComponentClient());
+  const channelRef = useRef<RealtimeChannel | null>(null);
+
+  useEffect(() => {
+    if (!onUpdate) return;
+
+    const supabase = supabaseRef.current;
+    const channelName = `thumbnail-progress-event-${eventId}`;
+
+    const channel = supabase
+      .channel(channelName)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'slides',
+        filter: eventId ? `speeches.sessions.event_id=eq.${eventId}` : undefined,
+      }, (payload) => {
+        const newData = payload.new as any;
+
+        // Only process thumbnail-related updates
+        if (!('thumbnail_status' in newData)) return;
+
+        const update: ThumbnailUpdate = {
+          slide_id: newData.id,
+          thumbnail_status: newData.thumbnail_status,
+          thumbnail_r2_key: newData.thumbnail_r2_key,
+          thumbnail_generated_at: newData.thumbnail_generated_at,
+        };
+
+        onUpdate(update);
+      })
+      .subscribe();
+
+    channelRef.current = channel;
+
+    return () => {
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+      }
+    };
+  }, [eventId, onUpdate]);
+}
+```
+
+**Component Usage**:
+```typescript
+// In DashboardSessionsSpeeches component
+useThumbnailProgress({
+  eventId,
+  onUpdate: async (update) => {
+    // Fetch slide to get speech_id
+    const { data: slide } = await supabase
+      .from('slides')
+      .select('speech_id')
+      .eq('id', update.slide_id)
+      .single();
+
+    // Update speech state
+    setSpeeches(prevSpeeches =>
+      prevSpeeches.map(speech => {
+        if (speech.id === slide.speech_id) {
+          return {
+            ...speech,
+            thumbnail_status: update.thumbnail_status,
+            first_slide_thumbnail: update.thumbnail_r2_key,
+          };
+        }
+        return speech;
+      })
+    );
+  },
+});
+```
+
+**Benefits**:
+- Live progress updates (no polling)
+- WebSocket-based (efficient)
+- Event-scoped subscriptions (reduces noise)
+- Automatic cleanup on unmount
+
+### Netlify Scheduled Functions for Batch Processing
+**Pattern**: Cron-based serverless function for retroactive generation
+**Location**: `frontend/netlify/functions/scheduled-thumbnail-generation.ts`
+
+```typescript
+export const handler: Handler = async (event, context) => {
+  const CONFIG = {
+    MAX_SLIDES_PER_RUN: 50,
+    MAX_SLIDES_PER_TENANT: 10,
+    PROCESSING_DELAY_MS: 2000,
+  };
+
+  // 1. Query eligible slides (no thumbnail, event toggle enabled, <30 days old)
+  const eligibleSlides = await getEligibleSlides();
+
+  // 2. Group by tenant for quota management
+  const slidesByTenant = groupSlidesByTenant(eligibleSlides);
+
+  // 3. Process tenant by tenant
+  for (const [tenantId, slides] of Object.entries(slidesByTenant)) {
+    // Check quota before processing
+    const hasQuota = await hasQuotaAvailable(tenantId);
+    if (!hasQuota) continue;
+
+    // Process up to 10 slides per tenant (fairness)
+    const slidesToProcess = slides.slice(0, CONFIG.MAX_SLIDES_PER_TENANT);
+
+    for (const slide of slidesToProcess) {
+      await initiateThumbnailGeneration({ slideId: slide.id, tenantId, eventId: slide.event_id });
+
+      // Rate limiting delay
+      await sleep(CONFIG.PROCESSING_DELAY_MS);
+    }
+  }
+
+  return { statusCode: 200, body: JSON.stringify({ processed: result.processed }) };
+};
+```
+
+**Schedule Configuration** (`netlify.toml`):
+```toml
+# Configure via Netlify Dashboard or CLI
+# netlify functions:schedule scheduled-thumbnail-generation "0 2 * * *"
+```
+
+**Benefits**:
+- Automated retroactive generation
+- Quota-aware processing
+- Fair distribution across tenants
+- Rate limiting prevents CloudConvert throttling
+
+### Email Notifications with React Email + Resend
+**Pattern**: Template-based transactional emails with React components
+**Location**: `frontend/emails/ThumbnailFailureEmail.tsx`, `frontend/src/services/emailNotificationService.ts`
+
+**React Email Template**:
+```tsx
+export default function ThumbnailFailureEmail({
+  eventName,
+  failedSlides,
+  eventDashboardUrl,
+}: ThumbnailFailureEmailProps) {
+  return (
+    <Html>
+      <Head />
+      <Body style={{ fontFamily: 'Arial, sans-serif' }}>
+        <Container>
+          <Heading>⚠️ Thumbnail Generation Failures Detected</Heading>
+          <Text>Event: <strong>{eventName}</strong></Text>
+
+          <Section>
+            <Heading as="h2">Failed Slides ({failedSlides.length})</Heading>
+            {failedSlides.map((slide) => (
+              <Row key={slide.id}>
+                <Column>{slide.filename}</Column>
+                <Column><code>{slide.errorType}</code></Column>
+              </Row>
+            ))}
+          </Section>
+
+          <Button href={eventDashboardUrl}>View Event Dashboard</Button>
+          <Button href={`${eventDashboardUrl}?action=retry-all`}>Retry All Failed</Button>
+        </Container>
+      </Body>
+    </Html>
+  );
+}
+```
+
+**Email Service**:
+```typescript
+export async function sendThumbnailFailureNotification({
+  tenantId,
+  eventId,
+  adminEmail,
+}: SendThumbnailFailureParams) {
+  // 1. Query failure log for event
+  const failures = await queryFailureLog(eventId);
+
+  if (failures.length < 3) {
+    return; // Only send after 3+ failures
+  }
+
+  // 2. Render React Email template
+  const emailHtml = render(
+    <ThumbnailFailureEmail
+      eventName={event.name}
+      failedSlides={failures}
+      eventDashboardUrl={`${process.env.NEXT_PUBLIC_APP_URL}/admin/events/${eventId}`}
+    />
+  );
+
+  // 3. Send via Resend
+  await resend.emails.send({
+    from: process.env.NOTIFICATION_FROM_EMAIL!,
+    to: adminEmail,
+    subject: `⚠️ Thumbnail Generation Failures Detected - ${event.name}`,
+    html: emailHtml,
+  });
+}
+```
+
+**Benefits**:
+- Type-safe templates with React
+- Styled emails with inline CSS
+- Testable templates (can render in browser)
+- Resend handles deliverability
+
+### Idempotent Webhook Processing
+**Pattern**: Detect and skip duplicate webhook calls
+**Location**: `/api/webhooks/cloudconvert/route.ts`
+
+```typescript
+export async function POST(request: NextRequest) {
+  const payload = await request.json();
+
+  // Check if webhook already processed
+  const { data: existingJob } = await supabase
+    .from('cloudconvert_jobs')
+    .select('webhook_received_at, completed_at')
+    .eq('cloudconvert_job_id', payload.job.id)
+    .single();
+
+  if (existingJob?.webhook_received_at) {
+    console.log(`[Webhook] Already processed job ${payload.job.id}, skipping`);
+    return NextResponse.json({ message: 'Already processed' }, { status: 200 });
+  }
+
+  // Process webhook (download, upload, update DB)
+  await processWebhook(payload);
+
+  return NextResponse.json({ message: 'Processed' }, { status: 200 });
+}
+```
+
+**Benefits**:
+- Safe for duplicate webhooks (CloudConvert may retry)
+- Prevents double-processing
+- Returns 200 (prevents further retries)
+- No side effects on duplicate calls
 
 <!-- MANUAL ADDITIONS END -->

@@ -6,7 +6,6 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import EventForm from '@/components/admin/EventForm';
 import AdminHeader from '@/components/admin/AdminHeader';
 import EventPhotoManager from '@/components/admin/EventPhotoManager';
-import SessionManager from '@/components/admin/SessionManager';
 import TokenQRCode from '@/components/admin/TokenQRCode';
 
 interface Event {
@@ -33,12 +32,11 @@ export default function EditEventPage() {
   const eventId = params.id as string;
 
   const [event, setEvent] = useState<Event | null>(null);
-  const [sessions, setSessions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-  const [activeTab, setActiveTab] = useState<'details' | 'photos' | 'sessions' | 'tokens'>('details');
+  const [activeTab, setActiveTab] = useState<'details' | 'photos' | 'tokens'>('details');
   const [authToken, setAuthToken] = useState<string | null>(null);
 
   useEffect(() => {
@@ -81,19 +79,6 @@ export default function EditEventPage() {
 
       setEvent(eventData);
       setAuthToken(token);
-
-      // Fetch sessions for this event
-      const { data: sessionsData, error: sessionsError } = await supabase
-        .from('sessions')
-        .select('*')
-        .eq('event_id', eventId)
-        .order('display_order', { ascending: true });
-
-      if (sessionsError) {
-        console.error('Error fetching sessions:', sessionsError);
-      } else {
-        setSessions(sessionsData || []);
-      }
     } catch (err: any) {
       console.error('Error fetching event:', err);
       setError(err.message || 'Errore nel caricamento dell\'evento');
@@ -247,13 +232,11 @@ export default function EditEventPage() {
                 <h3 className="text-sm font-medium text-gray-700">
                   {activeTab === 'details' && 'Modifica Dettagli Evento'}
                   {activeTab === 'photos' && 'Gestisci Foto Evento'}
-                  {activeTab === 'sessions' && 'Gestisci Sessioni e Interventi'}
                   {activeTab === 'tokens' && 'Gestisci Token di Accesso'}
                 </h3>
                 <p className="text-xs text-gray-500 mt-1">
                   {activeTab === 'details' && 'Modifica i dettagli principali dell\'evento'}
                   {activeTab === 'photos' && 'Carica, ordina e gestisci le foto dell\'evento'}
-                  {activeTab === 'sessions' && 'Crea e organizza sessioni e interventi'}
                   {activeTab === 'tokens' && 'Genera token di accesso per eventi privati'}
                 </p>
               </div>
@@ -291,16 +274,6 @@ export default function EditEventPage() {
               }`}
             >
               Photos
-            </button>
-            <button
-              onClick={() => setActiveTab('sessions')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                activeTab === 'sessions'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              Sessions & Speeches
             </button>
             {event.visibility === 'private' && (
               <button
@@ -388,16 +361,6 @@ export default function EditEventPage() {
                 // Optionally refresh event data
                 fetchEvent();
               }}
-            />
-          )}
-
-          {/* Sessions & Speeches Tab */}
-          {activeTab === 'sessions' && authToken && (
-            <SessionManager
-              eventId={eventId}
-              eventDate={event.date}
-              sessions={sessions}
-              accessToken={authToken}
             />
           )}
 

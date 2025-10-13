@@ -4,6 +4,7 @@
 // Upload slides directly to Cloudflare R2 using presigned URLs
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import type { Slide, SlideUploadRequest, SlideUploadResponse } from '@/types/slide';
 import * as R2 from '@/lib/r2';
@@ -15,6 +16,7 @@ interface SlideUploadProps {
 }
 
 export default function SlideUpload({ eventId, speechId, accessToken }: SlideUploadProps) {
+  const router = useRouter();
   const supabase = createClientComponentClient();
   const [slides, setSlides] = useState<Slide[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -191,7 +193,23 @@ export default function SlideUpload({ eventId, speechId, accessToken }: SlideUpl
       });
 
       // -----------------------------------------------------------------------
-      // Step 3: Fetch updated slide metadata and refresh list
+      // Step 3: Trigger thumbnail generation (async, don't wait for completion)
+      // -----------------------------------------------------------------------
+      setUploadProgress(95); // 95% - Upload complete, triggering thumbnail
+
+      // Trigger thumbnail generation in the background
+      fetch(`/api/slides/${uploadData.slide_id}/generate-thumbnail`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }).catch((error) => {
+        console.warn('Thumbnail generation trigger failed:', error);
+        // Don't block the upload flow if thumbnail generation fails
+      });
+
+      // -----------------------------------------------------------------------
+      // Step 4: Fetch updated slide metadata and refresh list
       // -----------------------------------------------------------------------
       setUploadProgress(100);
 
@@ -204,8 +222,10 @@ export default function SlideUpload({ eventId, speechId, accessToken }: SlideUpl
       const fileInput = document.getElementById('file-input') as HTMLInputElement;
       if (fileInput) fileInput.value = '';
 
-      // Show success briefly
-      setTimeout(() => setUploadProgress(0), 1000);
+      // Show success briefly then redirect to dashboard
+      setTimeout(() => {
+        router.push(`/admin/events/${eventId}/dashboard`);
+      }, 1000);
     } catch (error) {
       console.error('Upload error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';

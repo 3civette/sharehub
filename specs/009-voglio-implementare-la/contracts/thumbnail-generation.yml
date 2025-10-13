@@ -1,0 +1,358 @@
+# API Contract: Thumbnail Generation
+# Feature: 009-voglio-implementare-la
+# Endpoint: POST /api/slides/[id]/generate-thumbnail
+# Purpose: Initiate CloudConvert thumbnail generation for uploaded slide
+
+openapi: 3.0.0
+info:
+  title: Thumbnail Generation API
+  version: 1.0.0
+  description: |
+    Initiates asynchronous thumbnail generation for an uploaded slide using CloudConvert API.
+    This endpoint integrates with the CloudConvert service to convert the first slide of a
+    presentation (PPT/PPTX/PDF) into a 300x300px JPEG thumbnail.
+
+paths:
+  /api/slides/{id}/generate-thumbnail:
+    post:
+      summary: Generate thumbnail for slide
+      description: |
+        Initiates CloudConvert job to generate thumbnail from first slide of uploaded presentation.
+
+        **Business Logic**:
+        1. Authenticate admin user
+        2. Verify slide exists and belongs to user's tenant
+        3. Check event has thumbnail_generation_enabled = true
+        4. Check tenant quota (5 free thumbnails)
+        5. Reserve quota atomically (check_and_increment_thumbnail_quota)
+        6. Create CloudConvert job
+        7. Create cloudconvert_jobs tracking record
+        8. Update slides.thumbnail_status to 'processing'
+        9. Return 202 Accepted immediately (async processing)
+
+        **Error Recovery**:
+        - If CloudConvert API fails: Rollback quota, set thumbnail_status = 'failed'
+        - If quota exhausted: Return 403 with upgrade prompt
+        - If event toggle disabled: Return 400 with clear message
+
+      operationId: generateThumbnail
+      tags:
+        - Thumbnails
+      security:
+        - supabaseAuth: []
+
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: UUID of the slide to generate thumbnail for
+          schema:
+            type: string
+            format: uuid
+            example: "550e8400-e29b-41d4-a716-446655440000"
+
+      responses:
+        '202':
+          description: |
+            Thumbnail generation started successfully.
+            Client should poll slide status or use Supabase Realtime to track completion.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                  - status
+                  - slide_id
+                  - job_id
+                  - quota
+                properties:
+                  message:
+                    type: string
+                    example: "Thumbnail generation started"
+                  status:
+                    type: string
+                    enum: [processing]
+                    example: "processing"
+                  slide_id:
+                    type: string
+                    format: uuid
+                    example: "550e8400-e29b-41d4-a716-446655440000"
+                  job_id:
+                    type: string
+                    description: Internal cloudconvert_jobs.id (not CloudConvert job ID)
+                    format: uuid
+                    example: "660f9511-f30c-52e5-b827-557766551111"
+                  quota:
+                    type: object
+                    required:
+                      - used
+                      - total
+                      - remaining
+                    properties:
+                      used:
+                        type: integer
+                        example: 1
+                        description: Thumbnails used after this request
+                      total:
+                        type: integer
+                        example: 5
+                        description: Total thumbnails available
+                      remaining:
+                        type: integer
+                        example: 4
+                        description: Thumbnails remaining
+
+        '200':
+          description: |
+            Thumbnail already exists or generation not needed.
+            No action taken.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                  - status
+                properties:
+                  message:
+                    type: string
+                    example: "Thumbnail already exists"
+                  status:
+                    type: string
+                    enum: [completed, none]
+                    example: "completed"
+
+        '400':
+          description: Invalid request or business logic violation
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - error
+                  - message
+                properties:
+                  error:
+                    type: string
+                    enum:
+                      - INVALID_SLIDE_ID
+                      - THUMBNAIL_GENERATION_DISABLED
+                      - UNSUPPORTED_FILE_TYPE
+                  message:
+                    type: string
+                    example: "Thumbnail generation is disabled for this event"
+                  field:
+                    type: string
+                    example: "slide_id"
+              examples:
+                disabledToggle:
+                  summary: Event toggle disabled
+                  value:
+                    error: "THUMBNAIL_GENERATION_DISABLED"
+                    message: "Thumbnail generation is disabled for this event. Enable it in event settings."
+                unsupportedType:
+                  summary: Unsupported file type
+                  value:
+                    error: "UNSUPPORTED_FILE_TYPE"
+                    message: "Thumbnail generation only supports PPT, PPTX, PDF, JPEG, PNG files"
+                    file_type: "application/vnd.ms-excel"
+
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - error
+                  - message
+                properties:
+                  error:
+                    type: string
+                    example: "UNAUTHORIZED"
+                  message:
+                    type: string
+                    example: "Authentication required"
+
+        '403':
+          description: Quota exhausted or insufficient permissions
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - error
+                  - message
+                  - quota
+                properties:
+                  error:
+                    type: string
+                    enum:
+                      - QUOTA_EXHAUSTED
+                      - FORBIDDEN
+                  message:
+                    type: string
+                    example: "Thumbnail quota exhausted. Upgrade to generate more thumbnails."
+                  quota:
+                    type: object
+                    required:
+                      - used
+                      - total
+                      - remaining
+                    properties:
+                      used:
+                        type: integer
+                        example: 5
+                      total:
+                        type: integer
+                        example: 5
+                      remaining:
+                        type: integer
+                        example: 0
+                  upgrade_url:
+                    type: string
+                    example: "/admin/billing/upgrade"
+                    description: URL to purchase additional thumbnails (future feature)
+
+        '404':
+          description: Slide not found or access denied
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - error
+                  - message
+                properties:
+                  error:
+                    type: string
+                    example: "SLIDE_NOT_FOUND"
+                  message:
+                    type: string
+                    example: "Slide not found or access denied"
+
+        '500':
+          description: Internal server error or CloudConvert API failure
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - error
+                  - message
+                properties:
+                  error:
+                    type: string
+                    enum:
+                      - CLOUDCONVERT_API_ERROR
+                      - INTERNAL_SERVER_ERROR
+                  message:
+                    type: string
+                    example: "CloudConvert API is temporarily unavailable. Please try again later."
+                  retry_after:
+                    type: integer
+                    description: Seconds to wait before retrying
+                    example: 60
+
+components:
+  securitySchemes:
+    supabaseAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Supabase authentication token from session cookie
+
+# Contract Test Requirements
+x-contract-tests:
+  - name: "Successful thumbnail generation initiation"
+    request:
+      authenticated: true
+      slide_exists: true
+      event_toggle_enabled: true
+      quota_available: true
+    expected:
+      status: 202
+      body:
+        status: "processing"
+        quota.remaining: 4
+    postconditions:
+      - thumbnail_status: "processing"
+      - cloudconvert_jobs_created: true
+      - quota_incremented: true
+
+  - name: "Quota exhausted blocks generation"
+    request:
+      authenticated: true
+      slide_exists: true
+      event_toggle_enabled: true
+      quota_available: false
+    expected:
+      status: 403
+      body:
+        error: "QUOTA_EXHAUSTED"
+        quota.remaining: 0
+    postconditions:
+      - thumbnail_status: "pending" # Unchanged
+      - cloudconvert_jobs_created: false
+      - quota_incremented: false
+
+  - name: "Event toggle disabled blocks generation"
+    request:
+      authenticated: true
+      slide_exists: true
+      event_toggle_enabled: false
+      quota_available: true
+    expected:
+      status: 400
+      body:
+        error: "THUMBNAIL_GENERATION_DISABLED"
+    postconditions:
+      - thumbnail_status: "pending" # Unchanged
+      - quota_incremented: false
+
+  - name: "Thumbnail already exists returns 200"
+    request:
+      authenticated: true
+      slide_exists: true
+      thumbnail_status: "completed"
+    expected:
+      status: 200
+      body:
+        status: "completed"
+    postconditions:
+      - thumbnail_status: "completed" # Unchanged
+      - quota_incremented: false
+
+  - name: "Unauthenticated request returns 401"
+    request:
+      authenticated: false
+    expected:
+      status: 401
+      body:
+        error: "UNAUTHORIZED"
+
+  - name: "Slide not found returns 404"
+    request:
+      authenticated: true
+      slide_exists: false
+    expected:
+      status: 404
+      body:
+        error: "SLIDE_NOT_FOUND"
+
+  - name: "CloudConvert API failure rolls back quota"
+    request:
+      authenticated: true
+      slide_exists: true
+      event_toggle_enabled: true
+      quota_available: true
+      cloudconvert_api_fails: true
+    expected:
+      status: 500
+      body:
+        error: "CLOUDCONVERT_API_ERROR"
+    postconditions:
+      - thumbnail_status: "failed"
+      - quota_incremented: false # Rolled back
+      - failure_log_created: true
