@@ -1,0 +1,333 @@
+# API Contract: Thumbnail Generation Retry
+# Feature: 009-voglio-implementare-la
+# Endpoint: POST /api/admin/thumbnails/retry
+# Purpose: Manually retry failed thumbnail generation for a specific slide
+
+openapi: 3.0.0
+info:
+  title: Thumbnail Retry API
+  version: 1.0.0
+  description: |
+    Allows admins to manually retry thumbnail generation for slides with failed status.
+    Checks quota availability and event toggle before initiating retry.
+
+paths:
+  /api/admin/thumbnails/retry:
+    post:
+      summary: Retry failed thumbnail generation
+      description: |
+        Manually retry thumbnail generation for a slide with failed status.
+
+        **Business Logic**:
+        1. Authenticate admin user
+        2. Verify slide exists and belongs to user's tenant
+        3. Check slide has thumbnail_status = 'failed'
+        4. Check event has thumbnail_generation_enabled = true
+        5. Check tenant quota available
+        6. Reserve quota atomically (check_and_increment_thumbnail_quota)
+        7. Create new CloudConvert job
+        8. Update slides.thumbnail_status to 'processing'
+        9. Return 202 Accepted
+
+        **Use Cases**:
+        - Admin manually retries after fixing file format issue
+        - Admin retries after temporary CloudConvert outage
+        - Admin retries after purchasing additional quota
+
+      operationId: retryThumbnailGeneration
+      tags:
+        - Thumbnails
+        - Admin
+      security:
+        - supabaseAuth: []
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - slide_id
+              properties:
+                slide_id:
+                  type: string
+                  format: uuid
+                  description: UUID of the slide to retry thumbnail generation
+                  example: "550e8400-e29b-41d4-a716-446655440000"
+
+      responses:
+        '202':
+          description: Thumbnail generation retry started successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                  - status
+                  - slide_id
+                  - job_id
+                  - quota
+                properties:
+                  message:
+                    type: string
+                    example: "Thumbnail generation retry started"
+                  status:
+                    type: string
+                    enum: [processing]
+                    example: "processing"
+                  slide_id:
+                    type: string
+                    format: uuid
+                    example: "550e8400-e29b-41d4-a716-446655440000"
+                  job_id:
+                    type: string
+                    format: uuid
+                    description: New cloudconvert_jobs.id
+                    example: "770f9622-g41d-63f6-c938-668877662222"
+                  quota:
+                    type: object
+                    required:
+                      - used
+                      - total
+                      - remaining
+                    properties:
+                      used:
+                        type: integer
+                        example: 3
+                      total:
+                        type: integer
+                        example: 5
+                      remaining:
+                        type: integer
+                        example: 2
+
+        '400':
+          description: Invalid request or business logic violation
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - error
+                  - message
+                properties:
+                  error:
+                    type: string
+                    enum:
+                      - INVALID_SLIDE_ID
+                      - THUMBNAIL_NOT_FAILED
+                      - THUMBNAIL_GENERATION_DISABLED
+                      - MISSING_REQUIRED_FIELD
+                  message:
+                    type: string
+                  field:
+                    type: string
+              examples:
+                notFailed:
+                  summary: Thumbnail not in failed state
+                  value:
+                    error: "THUMBNAIL_NOT_FAILED"
+                    message: "Thumbnail is not in failed state. Current status: completed"
+                    current_status: "completed"
+                disabledToggle:
+                  summary: Event toggle disabled
+                  value:
+                    error: "THUMBNAIL_GENERATION_DISABLED"
+                    message: "Thumbnail generation is disabled for this event"
+                missingField:
+                  summary: Missing slide_id
+                  value:
+                    error: "MISSING_REQUIRED_FIELD"
+                    message: "slide_id is required"
+                    field: "slide_id"
+
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - error
+                  - message
+                properties:
+                  error:
+                    type: string
+                    example: "UNAUTHORIZED"
+                  message:
+                    type: string
+                    example: "Authentication required"
+
+        '403':
+          description: Quota exhausted or insufficient permissions
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - error
+                  - message
+                  - quota
+                properties:
+                  error:
+                    type: string
+                    enum:
+                      - QUOTA_EXHAUSTED
+                      - FORBIDDEN
+                  message:
+                    type: string
+                    example: "Thumbnail quota exhausted. Purchase additional thumbnails to retry."
+                  quota:
+                    type: object
+                    required:
+                      - used
+                      - total
+                      - remaining
+                    properties:
+                      used:
+                        type: integer
+                        example: 5
+                      total:
+                        type: integer
+                        example: 5
+                      remaining:
+                        type: integer
+                        example: 0
+                  upgrade_url:
+                    type: string
+                    example: "/admin/billing/upgrade"
+
+        '404':
+          description: Slide not found or access denied
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - error
+                  - message
+                properties:
+                  error:
+                    type: string
+                    example: "SLIDE_NOT_FOUND"
+                  message:
+                    type: string
+                    example: "Slide not found or access denied"
+
+        '500':
+          description: Internal server error or CloudConvert API failure
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - error
+                  - message
+                properties:
+                  error:
+                    type: string
+                    enum:
+                      - CLOUDCONVERT_API_ERROR
+                      - INTERNAL_SERVER_ERROR
+                  message:
+                    type: string
+                    example: "CloudConvert API is temporarily unavailable"
+                  retry_after:
+                    type: integer
+                    description: Seconds to wait before retrying
+                    example: 60
+
+components:
+  securitySchemes:
+    supabaseAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Supabase authentication token from session cookie
+
+# Contract Test Requirements
+x-contract-tests:
+  - name: "Successful retry of failed thumbnail"
+    request:
+      authenticated: true
+      slide_exists: true
+      thumbnail_status: "failed"
+      event_toggle_enabled: true
+      quota_available: true
+    expected:
+      status: 202
+      body:
+        status: "processing"
+        quota.remaining: 4
+    postconditions:
+      - thumbnail_status: "processing"
+      - cloudconvert_jobs_created: true
+      - quota_incremented: true
+      - previous_failed_job_exists: true # Old job not deleted
+
+  - name: "Retry with quota exhausted returns 403"
+    request:
+      authenticated: true
+      slide_exists: true
+      thumbnail_status: "failed"
+      event_toggle_enabled: true
+      quota_available: false
+    expected:
+      status: 403
+      body:
+        error: "QUOTA_EXHAUSTED"
+        quota.remaining: 0
+    postconditions:
+      - thumbnail_status: "failed" # Unchanged
+      - quota_incremented: false
+
+  - name: "Retry on non-failed thumbnail returns 400"
+    request:
+      authenticated: true
+      slide_exists: true
+      thumbnail_status: "completed"
+    expected:
+      status: 400
+      body:
+        error: "THUMBNAIL_NOT_FAILED"
+        current_status: "completed"
+
+  - name: "Retry with event toggle disabled returns 400"
+    request:
+      authenticated: true
+      slide_exists: true
+      thumbnail_status: "failed"
+      event_toggle_enabled: false
+    expected:
+      status: 400
+      body:
+        error: "THUMBNAIL_GENERATION_DISABLED"
+
+  - name: "Unauthenticated request returns 401"
+    request:
+      authenticated: false
+    expected:
+      status: 401
+      body:
+        error: "UNAUTHORIZED"
+
+  - name: "Slide not found returns 404"
+    request:
+      authenticated: true
+      slide_exists: false
+    expected:
+      status: 404
+      body:
+        error: "SLIDE_NOT_FOUND"
+
+  - name: "Missing slide_id returns 400"
+    request:
+      authenticated: true
+      body: {}
+    expected:
+      status: 400
+      body:
+        error: "MISSING_REQUIRED_FIELD"
+        field: "slide_id"

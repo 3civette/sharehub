@@ -1,0 +1,218 @@
+# API Contract: Thumbnail Quota
+# Feature: 009-voglio-implementare-la
+# Endpoint: GET /api/admin/thumbnails/quota
+# Purpose: Get tenant thumbnail quota information for display in admin UI
+
+openapi: 3.0.0
+info:
+  title: Thumbnail Quota API
+  version: 1.0.0
+  description: |
+    Retrieve tenant thumbnail quota information for display in admin dashboard.
+    Shows remaining free thumbnails and provides cost transparency.
+
+paths:
+  /api/admin/thumbnails/quota:
+    get:
+      summary: Get tenant thumbnail quota
+      description: |
+        Returns current thumbnail quota status for authenticated admin's tenant.
+
+        **Business Logic**:
+        1. Authenticate admin user
+        2. Get admin's tenant_id from admins table
+        3. Query tenants table for quota information
+        4. Return quota with percentage calculations
+
+        **Use Cases**:
+        - Display remaining quota badge in admin dashboard
+        - Show upgrade prompt when quota low/exhausted
+        - Provide cost transparency to admins
+
+      operationId: getThumbnailQuota
+      tags:
+        - Thumbnails
+        - Admin
+      security:
+        - supabaseAuth: []
+
+      responses:
+        '200':
+          description: Quota information retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - used
+                  - total
+                  - remaining
+                  - percentage_used
+                properties:
+                  used:
+                    type: integer
+                    minimum: 0
+                    example: 2
+                    description: Number of thumbnails used
+                  total:
+                    type: integer
+                    minimum: 0
+                    example: 5
+                    description: Total thumbnails available (free + purchased)
+                  remaining:
+                    type: integer
+                    minimum: 0
+                    example: 3
+                    description: Thumbnails remaining (total - used)
+                  percentage_used:
+                    type: number
+                    format: float
+                    minimum: 0
+                    maximum: 100
+                    example: 40.0
+                    description: Percentage of quota used (for progress bars)
+                  quota_exhausted:
+                    type: boolean
+                    example: false
+                    description: True if remaining = 0
+                  quota_status:
+                    type: string
+                    enum: [available, low, exhausted]
+                    example: "available"
+                    description: |
+                      - available: > 20% remaining
+                      - low: <= 20% remaining but > 0
+                      - exhausted: 0 remaining
+              examples:
+                available:
+                  summary: Quota available
+                  value:
+                    used: 2
+                    total: 5
+                    remaining: 3
+                    percentage_used: 40.0
+                    quota_exhausted: false
+                    quota_status: "available"
+                low:
+                  summary: Quota low
+                  value:
+                    used: 4
+                    total: 5
+                    remaining: 1
+                    percentage_used: 80.0
+                    quota_exhausted: false
+                    quota_status: "low"
+                exhausted:
+                  summary: Quota exhausted
+                  value:
+                    used: 5
+                    total: 5
+                    remaining: 0
+                    percentage_used: 100.0
+                    quota_exhausted: true
+                    quota_status: "exhausted"
+
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - error
+                  - message
+                properties:
+                  error:
+                    type: string
+                    example: "UNAUTHORIZED"
+                  message:
+                    type: string
+                    example: "Authentication required"
+
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - error
+                  - message
+                properties:
+                  error:
+                    type: string
+                    example: "INTERNAL_SERVER_ERROR"
+                  message:
+                    type: string
+                    example: "Failed to retrieve quota information"
+
+components:
+  securitySchemes:
+    supabaseAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Supabase authentication token from session cookie
+
+# Contract Test Requirements
+x-contract-tests:
+  - name: "Successful quota retrieval with available quota"
+    request:
+      authenticated: true
+      tenant_quota_used: 2
+      tenant_quota_total: 5
+    expected:
+      status: 200
+      body:
+        used: 2
+        total: 5
+        remaining: 3
+        percentage_used: 40.0
+        quota_exhausted: false
+        quota_status: "available"
+
+  - name: "Quota retrieval with low quota (warning state)"
+    request:
+      authenticated: true
+      tenant_quota_used: 4
+      tenant_quota_total: 5
+    expected:
+      status: 200
+      body:
+        used: 4
+        total: 5
+        remaining: 1
+        percentage_used: 80.0
+        quota_exhausted: false
+        quota_status: "low"
+
+  - name: "Quota retrieval with exhausted quota"
+    request:
+      authenticated: true
+      tenant_quota_used: 5
+      tenant_quota_total: 5
+    expected:
+      status: 200
+      body:
+        used: 5
+        total: 5
+        remaining: 0
+        percentage_used: 100.0
+        quota_exhausted: true
+        quota_status: "exhausted"
+
+  - name: "Unauthenticated request returns 401"
+    request:
+      authenticated: false
+    expected:
+      status: 401
+      body:
+        error: "UNAUTHORIZED"
+
+  - name: "Response includes all required fields"
+    request:
+      authenticated: true
+    expected:
+      status: 200
+      body_schema:
+        required: [used, total, remaining, percentage_used, quota_exhausted, quota_status]

@@ -47,6 +47,15 @@
 # 3. Add schedule: "0 */6 * * *" (every 6 hours)
 # 4. Or use: netlify functions:schedule api-cleanup "0 */6 * * *"
 
+# Feature 009: CloudConvert Thumbnail Generation - Retroactive generation
+# This function generates thumbnails for existing slides without them
+# Schedule: "0 2 * * *" (daily at 2:00 AM UTC)
+# Configuration steps:
+# 1. Go to Netlify Dashboard → Site → Functions
+# 2. Select the scheduled-thumbnail-generation function
+# 3. Add schedule: "0 2 * * *" (daily at 2:00 AM UTC)
+# 4. Or use: netlify functions:schedule scheduled-thumbnail-generation "0 2 * * *"
+
 # ============================================================================
 # Environment Variables Configuration Template
 # ============================================================================

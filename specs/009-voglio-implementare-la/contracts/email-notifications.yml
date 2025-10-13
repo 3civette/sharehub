@@ -1,0 +1,306 @@
+# API Contract: Email Notifications (Internal Service)
+# Feature: 009-voglio-implementare-la
+# Service: Email Notification Service (Resend)
+# Purpose: Send email notifications to admins after repeated thumbnail generation failures
+
+# NOTE: This is not a public HTTP endpoint, but an internal service contract.
+# Email notifications are triggered internally after detecting 3+ consecutive failures.
+
+openapi: 3.0.0
+info:
+  title: Email Notification Service Contract
+  version: 1.0.0
+  description: |
+    Internal service contract for email notification system using Resend API.
+    Sends transactional emails to event admins after detecting repeated thumbnail generation failures.
+
+x-internal-service: true
+
+components:
+  schemas:
+    ThumbnailFailureEmailData:
+      type: object
+      required:
+        - event_id
+        - event_name
+        - admin_email
+        - failure_count
+        - failed_slides
+      properties:
+        event_id:
+          type: string
+          format: uuid
+          description: UUID of the event with failures
+          example: "440e7511-d30b-42e5-a827-557655440000"
+        event_name:
+          type: string
+          description: Name of the event
+          example: "Annual Conference 2025"
+        admin_email:
+          type: string
+          format: email
+          description: Email address of the event admin
+          example: "admin@example.com"
+        admin_name:
+          type: string
+          description: Name of the admin (optional)
+          example: "John Doe"
+        failure_count:
+          type: integer
+          minimum: 3
+          description: Number of consecutive failures detected
+          example: 5
+        failed_slides:
+          type: array
+          minItems: 1
+          description: List of slides that failed thumbnail generation
+          items:
+            type: object
+            required:
+              - slide_id
+              - filename
+              - error_type
+              - occurred_at
+            properties:
+              slide_id:
+                type: string
+                format: uuid
+                example: "550e8400-e29b-41d4-a716-446655440000"
+              filename:
+                type: string
+                example: "presentation.pptx"
+              error_type:
+                type: string
+                enum:
+                  - cloudconvert_api_error
+                  - webhook_timeout
+                  - quota_exceeded
+                  - invalid_format
+                  - network_error
+                example: "cloudconvert_api_error"
+              error_message:
+                type: string
+                example: "CloudConvert API returned 500 Internal Server Error"
+              occurred_at:
+                type: string
+                format: date-time
+                example: "2025-01-13T14:30:00Z"
+        tenant_id:
+          type: string
+          format: uuid
+          description: Tenant ID for logging purposes
+          example: "770f9622-g41d-63f6-c938-668877662222"
+
+    EmailSendResponse:
+      type: object
+      required:
+        - success
+        - email_id
+      properties:
+        success:
+          type: boolean
+          example: true
+        email_id:
+          type: string
+          description: Resend email ID for tracking
+          example: "re_123abc456def"
+        message:
+          type: string
+          example: "Email sent successfully"
+        error:
+          type: string
+          description: Error message if success = false
+          example: "Invalid email address"
+
+# Internal Service Methods
+x-service-methods:
+  sendThumbnailFailureEmail:
+    description: |
+      Send email notification to event admin after detecting 3+ consecutive thumbnail failures.
+
+      **Business Logic**:
+      1. Check failure_count >= 3
+      2. Validate admin_email format
+      3. Render email template with failure details
+      4. Send via Resend API
+      5. Log email_id in database for tracking
+      6. Return success/error status
+
+      **Email Template**:
+      - Subject: "⚠️ Thumbnail Generation Failures Detected - {{event_name}}"
+      - From: "shareHub Notifications <notifications@sharehub.app>"
+      - Reply-To: "support@sharehub.app"
+      - Template: React Email component (thumbnail-failure-notification.tsx)
+
+      **Rate Limiting**:
+      - Max 1 email per event per 24 hours
+      - Store last_notification_sent_at in events table (future enhancement)
+
+    input:
+      $ref: '#/components/schemas/ThumbnailFailureEmailData'
+    output:
+      $ref: '#/components/schemas/EmailSendResponse'
+
+    error_cases:
+      - code: "INVALID_EMAIL"
+        message: "Admin email address is invalid"
+      - code: "RESEND_API_ERROR"
+        message: "Resend API returned an error"
+      - code: "RATE_LIMITED"
+        message: "Email already sent for this event in the last 24 hours"
+
+# Email Template Structure
+x-email-template:
+  name: "thumbnail-failure-notification"
+  file: "frontend/src/emails/thumbnail-failure-notification.tsx"
+  framework: "React Email (react-email)"
+  structure:
+    header:
+      logo: "shareHub logo"
+      title: "Thumbnail Generation Issue Detected"
+    body:
+      sections:
+        - type: "alert"
+          content: "We've detected {{failure_count}} consecutive thumbnail generation failures for your event '{{event_name}}'."
+        - type: "failure_list"
+          content: |
+            **Failed Slides**:
+            {{#each failed_slides}}
+            - {{filename}} ({{error_type}})
+              Error: {{error_message}}
+              Time: {{occurred_at}}
+            {{/each}}
+        - type: "actions"
+          buttons:
+            - label: "View Event Dashboard"
+              url: "https://app.sharehub.com/admin/events/{{event_id}}"
+              color: "primary"
+            - label: "Retry All Failed Thumbnails"
+              url: "https://app.sharehub.com/admin/events/{{event_id}}/thumbnails/retry-all"
+              color: "secondary"
+        - type: "troubleshooting"
+          content: |
+            **Common Causes**:
+            - Unsupported file format (only PPT, PPTX, PDF supported)
+            - Corrupted or password-protected files
+            - Temporary CloudConvert API outage
+            - Quota exhausted ({{quota_remaining}} thumbnails remaining)
+
+            **Next Steps**:
+            1. Check file formats and re-upload if needed
+            2. Retry failed thumbnails manually
+            3. Contact support if issue persists
+    footer:
+      unsubscribe_link: false
+      support_email: "support@sharehub.app"
+
+# Contract Test Requirements
+x-contract-tests:
+  - name: "Send email after 3 consecutive failures"
+    input:
+      event_id: "440e7511-d30b-42e5-a827-557655440000"
+      event_name: "Test Event"
+      admin_email: "admin@example.com"
+      failure_count: 3
+      failed_slides:
+        - slide_id: "550e8400-e29b-41d4-a716-446655440000"
+          filename: "slide1.pptx"
+          error_type: "cloudconvert_api_error"
+          error_message: "API timeout"
+          occurred_at: "2025-01-13T14:30:00Z"
+    expected:
+      success: true
+      email_id: "re_123abc"
+    postconditions:
+      - email_sent_to: "admin@example.com"
+      - email_subject_contains: "Thumbnail Generation Failures Detected"
+      - email_body_contains: "3 consecutive thumbnail generation failures"
+      - email_body_contains: "slide1.pptx"
+
+  - name: "Email includes all failed slides"
+    input:
+      event_id: "440e7511-d30b-42e5-a827-557655440000"
+      event_name: "Test Event"
+      admin_email: "admin@example.com"
+      failure_count: 5
+      failed_slides:
+        - slide_id: "550e8400-e29b-41d4-a716-446655440000"
+          filename: "slide1.pptx"
+          error_type: "cloudconvert_api_error"
+        - slide_id: "660f9511-f30c-52e5-b827-557766551111"
+          filename: "slide2.pdf"
+          error_type: "invalid_format"
+        - slide_id: "770f9622-g41d-63f6-c938-668877662222"
+          filename: "slide3.pptx"
+          error_type: "webhook_timeout"
+    expected:
+      success: true
+    postconditions:
+      - email_body_contains: "slide1.pptx"
+      - email_body_contains: "slide2.pdf"
+      - email_body_contains: "slide3.pptx"
+      - email_body_contains: "5 consecutive"
+
+  - name: "Invalid email address returns error"
+    input:
+      event_id: "440e7511-d30b-42e5-a827-557655440000"
+      event_name: "Test Event"
+      admin_email: "invalid-email"
+      failure_count: 3
+      failed_slides: []
+    expected:
+      success: false
+      error: "Invalid email address"
+    postconditions:
+      - email_not_sent: true
+
+  - name: "Resend API error returns error status"
+    input:
+      event_id: "440e7511-d30b-42e5-a827-557655440000"
+      event_name: "Test Event"
+      admin_email: "admin@example.com"
+      failure_count: 3
+      failed_slides: []
+      resend_api_fails: true
+    expected:
+      success: false
+      error: "Resend API returned an error"
+    postconditions:
+      - error_logged: true
+
+# Environment Variables Required
+x-environment-variables:
+  - name: RESEND_API_KEY
+    description: Resend API key for sending emails
+    required: true
+    example: "re_123abc456def"
+  - name: NOTIFICATION_FROM_EMAIL
+    description: From email address for notifications
+    required: true
+    example: "notifications@sharehub.app"
+  - name: SUPPORT_EMAIL
+    description: Support email for reply-to
+    required: true
+    example: "support@sharehub.app"
+
+# Integration Points
+x-integration-points:
+  - trigger: "After CloudConvert webhook failure processing"
+    condition: "thumbnail_failure_log has 3+ entries for event in last 24 hours"
+    function: "sendThumbnailFailureEmail()"
+    location: "frontend/src/app/api/webhooks/cloudconvert/route.ts"
+
+  - trigger: "After manual retry failure"
+    condition: "Retry fails and brings total failures to 3+"
+    function: "sendThumbnailFailureEmail()"
+    location: "frontend/src/app/api/admin/thumbnails/retry/route.ts"
+
+# Cost Analysis
+x-cost-analysis:
+  resend_free_tier: 3000 emails/month
+  projected_usage: 5-10 emails/month
+  monthly_cost: $0
+  notes: |
+    Failure notifications are rare (only sent after 3+ consecutive failures).
+    At projected scale (10 tenants, 50 events/month, 5% failure rate),
+    we expect ~5 notification emails per month, well within free tier.

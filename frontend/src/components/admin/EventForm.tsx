@@ -17,6 +17,7 @@ interface Event {
   description: string | null;
   visibility: 'public' | 'private';
   status: 'draft' | 'upcoming' | 'ongoing' | 'past';
+  thumbnail_generation_enabled?: boolean;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -30,6 +31,7 @@ interface EventCreateInput {
   end_date?: string;
   description?: string;
   visibility: 'public' | 'private';
+  thumbnail_generation_enabled?: boolean;
 }
 
 interface EventUpdateInput {
@@ -40,6 +42,7 @@ interface EventUpdateInput {
   end_date?: string;
   description?: string;
   visibility?: 'public' | 'private';
+  thumbnail_generation_enabled?: boolean;
 }
 
 interface EventFormProps {
@@ -61,7 +64,8 @@ export default function EventForm({
     organizer: initialData?.organizer || '',
     date: initialData?.date || '',
     description: initialData?.description || '',
-    visibility: (initialData?.visibility || 'public') as 'public' | 'private'
+    visibility: (initialData?.visibility || 'public') as 'public' | 'private',
+    thumbnail_generation_enabled: initialData?.thumbnail_generation_enabled || false
   });
 
   const [isMultiDay, setIsMultiDay] = useState(false);
@@ -78,7 +82,8 @@ export default function EventForm({
         organizer: initialData.organizer || '',
         date: initialData.date,
         description: initialData.description || '',
-        visibility: initialData.visibility
+        visibility: initialData.visibility,
+        thumbnail_generation_enabled: initialData.thumbnail_generation_enabled || false
       });
     }
   }, [initialData]);
@@ -223,7 +228,8 @@ export default function EventForm({
       date: formData.date,
       end_date: isMultiDay ? endDate : undefined,
       description: formData.description || undefined,
-      visibility: formData.visibility
+      visibility: formData.visibility,
+      thumbnail_generation_enabled: formData.thumbnail_generation_enabled
     };
 
     onSubmit(submitData);
@@ -466,6 +472,32 @@ export default function EventForm({
           {formData.visibility === 'private'
             ? 'Gli eventi privati richiedono token per l\'accesso'
             : 'Gli eventi pubblici sono accessibili a tutti i partecipanti'}
+        </p>
+      </div>
+
+      {/* Thumbnail Generation Toggle */}
+      <div>
+        <label className="flex items-center">
+          <input
+            type="checkbox"
+            checked={formData.thumbnail_generation_enabled}
+            onChange={(e) =>
+              setFormData((prev) => ({
+                ...prev,
+                thumbnail_generation_enabled: e.target.checked
+              }))
+            }
+            disabled={isReadOnly}
+            className="mr-2 h-4 w-4 text-primary focus:ring-2 focus:ring-primary border-gray-300 rounded"
+          />
+          <span className="text-sm font-medium !text-gray-900">
+            Genera thumbnail automaticamente
+          </span>
+        </label>
+        <p className="mt-1 text-xs text-brandInk/70 dark:text-gray-400">
+          {formData.thumbnail_generation_enabled
+            ? 'Le presentazioni caricate genereranno automaticamente thumbnail (5 gratis per tenant)'
+            : 'Le thumbnail non verranno generate automaticamente'}
         </p>
       </div>
 

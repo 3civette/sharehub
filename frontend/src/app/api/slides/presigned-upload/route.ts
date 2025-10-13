@@ -139,7 +139,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const session_id = speechData.session_id;
     const tenant_id = speechData.tenant_id;
     const event_id = (speechData.sessions as any)?.event_id;
 
@@ -154,13 +153,41 @@ export async function POST(request: NextRequest) {
     const r2Key = R2.generateKey(tenant_id, event_id, slideId, filename);
 
     // -------------------------------------------------------------------------
+    // Step 6.5: Calculate next display_order atomically
+    // -------------------------------------------------------------------------
+    // Use PostgreSQL function with row-level locking to prevent race conditions
+    const { data: displayOrderResult, error: displayOrderError } = await supabase.rpc(
+      'get_next_display_order',
+      { p_speech_id: speech_id }
+    );
+
+    console.log('[DEBUG] Display order calculation:', {
+      speech_id,
+      displayOrderResult,
+      displayOrderError,
+    });
+
+    if (displayOrderError || displayOrderResult === null) {
+      console.error('Failed to get next display_order:', displayOrderError);
+      return NextResponse.json(
+        {
+          error: 'DATABASE_ERROR',
+          message: 'Failed to calculate slide order',
+        },
+        { status: 500 }
+      );
+    }
+
+    const nextDisplayOrder = displayOrderResult;
+    console.log('[DEBUG] Using display_order:', nextDisplayOrder);
+
+    // -------------------------------------------------------------------------
     // Step 7: Create slide metadata in database
     // -------------------------------------------------------------------------
     const { data: slide, error: insertError } = await supabase
       .from('slides')
       .insert({
         id: slideId,
-        session_id: session_id,
         speech_id: speech_id,
         tenant_id: tenant_id,
         filename: filename,
@@ -171,6 +198,8 @@ export async function POST(request: NextRequest) {
         uploaded_at: new Date().toISOString(),
         storage_path: null, // R2 only, no Supabase Storage
         deleted_at: null,
+        thumbnail_status: 'pending', // Initialize thumbnail generation status
+        display_order: nextDisplayOrder, // Set unique display order
       })
       .select('id, r2_key, uploaded_at')
       .single();

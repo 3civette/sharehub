@@ -338,6 +338,63 @@ export async function deleteR2Object(r2Key: string): Promise<void> {
 }
 
 // =============================================================================
+// Direct R2 Upload (for server-side operations like thumbnail generation)
+// =============================================================================
+
+/**
+ * Upload file buffer directly to R2 (server-side only)
+ * Used for operations like thumbnail generation where we generate the file on the server
+ *
+ * @param r2Key - R2 object key
+ * @param buffer - File buffer
+ * @param contentType - MIME type
+ * @returns Promise<void>
+ * @throws {R2UploadError} If upload fails
+ */
+export async function uploadFileToR2(
+  r2Key: string,
+  buffer: Buffer,
+  contentType: string
+): Promise<void> {
+  try {
+    const client = getR2Client();
+
+    const command = new PutObjectCommand({
+      Bucket: R2_CONFIG.bucketName,
+      Key: r2Key,
+      Body: buffer,
+      ContentType: contentType,
+    });
+
+    await client.send(command);
+  } catch (error) {
+    if (error instanceof Error) {
+      const errorMessage = error.message.toLowerCase();
+
+      // Network errors
+      if (errorMessage.includes('network') || errorMessage.includes('enotfound') || errorMessage.includes('econnrefused')) {
+        throw new R2UploadError(`Network error: Unable to connect to R2. Please check your internet connection.`);
+      }
+
+      // Credentials errors
+      if (errorMessage.includes('credentials') || errorMessage.includes('access denied') || errorMessage.includes('InvalidAccessKeyId')) {
+        throw new R2UploadError(`Authentication failed: Invalid R2 credentials. Please check your R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY.`);
+      }
+
+      // Bucket errors
+      if (errorMessage.includes('bucket') || errorMessage.includes('NoSuchBucket')) {
+        throw new R2UploadError(`Bucket error: R2 bucket "${R2_CONFIG.bucketName}" not found. Please check R2_BUCKET_NAME configuration.`);
+      }
+
+      // Generic error
+      throw new R2UploadError(`Failed to upload file to R2: ${error.message}`);
+    }
+
+    throw new R2UploadError('Failed to upload file to R2: Unknown error');
+  }
+}
+
+// =============================================================================
 // Utility Functions
 // =============================================================================
 
@@ -414,6 +471,10 @@ export const R2 = {
   // Presigned URLs
   generateUploadUrl: generatePresignedUploadUrl,
   generateDownloadUrl: generatePresignedDownloadUrl,
+  getDownloadUrl: generatePresignedDownloadUrl, // Alias for consistency
+
+  // Direct upload (server-side only)
+  uploadFile: uploadFileToR2,
 
   // Deletion
   deleteObject: deleteR2Object,
