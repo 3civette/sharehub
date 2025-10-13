@@ -1,6 +1,7 @@
 // Feature 005-ora-facciamo-la: Event Management Dashboard
 // Service: Dashboard API client
 
+import { createClient } from '@supabase/supabase-js';
 import { Event, AccessToken } from '@/types/admin';
 
 interface Session {
@@ -64,33 +65,84 @@ export async function fetchDashboardData(
   eventId: string,
   token: string
 ): Promise<DashboardData> {
-  const response = await fetch(
-    `${process.env.NEXT_PUBLIC_API_URL}/api/admin/events/${eventId}/dashboard`,
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
+      global: {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       },
     }
   );
 
-  if (response.status === 403) {
+  // Fetch event
+  const { data: event, error: eventError } = await supabase
+    .from('events')
+    .select('*')
+    .eq('id', eventId)
+    .single();
+
+  if (eventError) {
+    if (eventError.code === 'PGRST116') {
+      throw new Error('Event not found');
+    }
     throw new Error('You do not have access to this event');
   }
 
-  if (response.status === 404) {
-    throw new Error('Event not found');
-  }
+  // Fetch access tokens
+  const { data: tokens } = await supabase
+    .from('access_tokens')
+    .select('*')
+    .eq('event_id', eventId)
+    .order('created_at', { ascending: false });
 
-  if (!response.ok) {
-    throw new Error('Failed to load dashboard data');
-  }
+  // Fetch sessions
+  const { data: sessions } = await supabase
+    .from('sessions')
+    .select('*')
+    .eq('event_id', eventId)
+    .order('start_time', { ascending: true });
 
-  return response.json();
+  // Fetch speeches with session info
+  const { data: speeches } = await supabase
+    .from('speeches')
+    .select(`
+      *,
+      session:sessions!inner(title)
+    `)
+    .eq('session.event_id', eventId)
+    .order('created_at', { ascending: true });
+
+  // Fetch photos
+  const { data: photos } = await supabase
+    .from('event_photos')
+    .select('*')
+    .eq('event_id', eventId)
+    .order('uploaded_at', { ascending: false });
+
+  // Calculate metrics (placeholder - can be enhanced with actual analytics)
+  const metrics: MetricsSummary = {
+    pageViews: 0,
+    slideDownloads: speeches?.reduce((sum, s) => sum + (s.slide_count || 0), 0) || 0,
+    participantCount: tokens?.length || 0,
+    lastRefreshed: new Date().toISOString(),
+  };
+
+  return {
+    event,
+    tokens: tokens || [],
+    sessions: sessions || [],
+    speeches: speeches || [],
+    photos: photos || [],
+    metrics,
+  };
 }
 
 /**
  * Download QR code PNG for a participant token
+ * TODO: Migrate to Next.js API route at /api/admin/tokens/[id]/qr
  * @param eventId - Event UUID
  * @param tokenId - Token UUID
  * @param token - Supabase auth token
@@ -101,6 +153,11 @@ export async function downloadTokenQR(
   tokenId: string,
   token: string
 ): Promise<void> {
+  // This function will need a dedicated Next.js API route
+  // Create /app/api/admin/tokens/[id]/qr/route.ts
+  throw new Error('QR code download needs migration to Next.js API route');
+
+  /* Original implementation - to be moved to API route:
   const response = await fetch(
     `${process.env.NEXT_PUBLIC_API_URL}/api/admin/events/${eventId}/tokens/${tokenId}/qr`,
     {
@@ -123,4 +180,5 @@ export async function downloadTokenQR(
   a.click();
   document.body.removeChild(a);
   window.URL.revokeObjectURL(url);
+  */
 }

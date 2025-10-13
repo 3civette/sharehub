@@ -29,21 +29,16 @@ export default async function SlidesUploadPage({ params }: PageProps) {
   }
 
   try {
-    // Fetch speech details
-    const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/api/admin/speeches/${params.speechId}`,
-      {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      }
-    );
+    // Fetch speech details from Supabase
+    const { data: speech, error: speechError } = await supabase
+      .from('speeches')
+      .select('*')
+      .eq('id', params.speechId)
+      .single();
 
-    if (!response.ok) {
+    if (speechError || !speech) {
       throw new Error('Failed to fetch speech');
     }
-
-    const speech = await response.json();
 
     return (
       <div className="min-h-screen bg-gradient-to-br from-primary/5 via-white to-secondary/5 dark:from-[#0B0B0C] dark:via-[#111827] dark:to-[#0B0B0C]">

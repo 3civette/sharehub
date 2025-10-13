@@ -65,22 +65,20 @@ export default function EditEventPage() {
         throw new Error('No authentication token available');
       }
 
-      // Fetch event from API
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-      const response = await fetch(`${API_URL}/admin/events/${eventId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+      // Fetch event from Supabase
+      const { data: eventData, error: eventError } = await supabase
+        .from('events')
+        .select('*')
+        .eq('id', eventId)
+        .single();
 
-      if (!response.ok) {
-        if (response.status === 404) {
+      if (eventError) {
+        if (eventError.code === 'PGRST116') {
           throw new Error('Evento non trovato');
         }
         throw new Error('Errore nel caricamento dell\'evento');
       }
 
-      const eventData = await response.json();
       setEvent(eventData);
       setAuthToken(token);
 
@@ -118,23 +116,27 @@ export default function EditEventPage() {
         throw new Error('No authentication token available');
       }
 
-      // Update event via API
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-      const response = await fetch(`${API_URL}/admin/events/${eventId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(data),
-      });
+      // Update event via Supabase
+      const { data: updatedEvent, error: updateError } = await supabase
+        .from('events')
+        .update({
+          name: data.name,
+          title: data.title,
+          organizer: data.organizer,
+          date: data.date,
+          end_date: data.end_date,
+          description: data.description,
+          visibility: data.visibility,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', eventId)
+        .select()
+        .single();
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Failed to update event');
+      if (updateError) {
+        throw new Error(updateError.message || 'Failed to update event');
       }
 
-      const updatedEvent = await response.json();
       setEvent(updatedEvent);
       setSuccess(true);
 
