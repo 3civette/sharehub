@@ -249,7 +249,7 @@ export default function EventForm({
           onChange={handleChange}
           onBlur={handleBlur}
           disabled={isReadOnly}
-          className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+          className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm !text-gray-900 placeholder:!text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
             errors.name && touched.name
               ? 'border-red-500'
               : 'border-gray-300'
@@ -278,7 +278,7 @@ export default function EventForm({
           onChange={handleChange}
           onBlur={handleBlur}
           disabled={isReadOnly}
-          className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+          className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm !text-gray-900 placeholder:!text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
             errors.title && touched.title
               ? 'border-red-500'
               : 'border-gray-300'
@@ -304,7 +304,7 @@ export default function EventForm({
           onChange={handleChange}
           onBlur={handleBlur}
           disabled={isReadOnly}
-          className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+          className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm !text-gray-900 placeholder:!text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
             errors.organizer && touched.organizer
               ? 'border-red-500'
               : 'border-gray-300'
@@ -331,7 +331,7 @@ export default function EventForm({
           onBlur={handleBlur}
           disabled={isReadOnly}
           min={getTodayDate()}
-          className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+          className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm !text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
             errors.date && touched.date
               ? 'border-red-500'
               : 'border-gray-300'
@@ -383,7 +383,7 @@ export default function EventForm({
             }}
             disabled={isReadOnly}
             min={formData.date || getTodayDate()}
-            className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+            className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm !text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
               errors.endDate && touched.endDate
                 ? 'border-red-500'
                 : 'border-gray-300'
@@ -408,7 +408,7 @@ export default function EventForm({
           onBlur={handleBlur}
           disabled={isReadOnly}
           rows={4}
-          className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+          className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm !text-gray-900 placeholder:!text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
             errors.description && touched.description
               ? 'border-red-500'
               : 'border-gray-300'
