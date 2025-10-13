@@ -183,17 +183,17 @@ export default function AdminBrandingPage() {
 
   if (tenantLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-primary/5 via-white to-secondary/5">
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-primary/5 via-white to-secondary/5 dark:from-[#0B0B0C] dark:via-[#111827] dark:to-[#0B0B0C]">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-brandInk/70">Caricamento...</p>
+          <p className="text-brandInk/70 dark:text-[#E5E7EB]">Caricamento...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-white to-secondary/5">
+    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-white to-secondary/5 dark:from-[#0B0B0C] dark:via-[#111827] dark:to-[#0B0B0C]">
       <AdminHeader
         title="Personalizzazione Branding"
         subtitle={`Personalizza colori e logo per ${tenant?.hotel_name}`}
@@ -253,8 +253,8 @@ export default function AdminBrandingPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Left Column - Controls */}
           <div className="space-y-6">
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-6">Configurazione</h2>
+            <div className="bg-white dark:bg-gray-900 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-800">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">Configurazione</h2>
 
               <div className="space-y-6">
                 {/* Logo Upload */}
@@ -311,8 +311,8 @@ export default function AdminBrandingPage() {
           </div>
 
           {/* Right Column - Preview */}
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-6">Anteprima</h2>
+          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-800">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">Anteprima</h2>
             <BrandingPreview
               primaryColor={primaryColor}
               secondaryColor={secondaryColor}

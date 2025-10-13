@@ -81,7 +81,7 @@ export default function AdminLayout({
       subscription.unsubscribe();
       window.removeEventListener('storage', handleStorageChange);
     };
-  }, [router, supabase]);
+  }, []); // Rimuovo dipendenze per evitare re-render infiniti
 
   // Show loading while checking auth
   if (isChecking) {

@@ -35,7 +35,7 @@ export default async function EventDashboardPage({ params }: PageProps) {
     const dashboardData = await fetchDashboardData(params.id, session.access_token);
 
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gradient-to-br from-primary/5 via-white to-secondary/5 dark:from-[#0B0B0C] dark:via-[#111827] dark:to-[#0B0B0C]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           {/* Back Navigation */}
           <div className="mb-6">
@@ -66,7 +66,7 @@ export default async function EventDashboardPage({ params }: PageProps) {
             />
 
             {/* Sessions & Speeches Summary */}
-            <div className="bg-white shadow rounded-lg p-6">
+            <div className="bg-white dark:bg-gray-900 shadow rounded-lg p-6 border border-gray-200 dark:border-gray-800">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xl font-bold text-brandBlack">Sessioni e Interventi</h2>
                 <div className="flex gap-2">
@@ -164,7 +164,7 @@ export default async function EventDashboardPage({ params }: PageProps) {
             </div>
 
             {/* Event Photos Summary */}
-            <div className="bg-white shadow rounded-lg p-6">
+            <div className="bg-white dark:bg-gray-900 shadow rounded-lg p-6 border border-gray-200 dark:border-gray-800">
               <h2 className="text-xl font-bold text-brandBlack mb-4">Galleria Foto</h2>
               {dashboardData.photos.length === 0 ? (
                 <p className="text-brandInk/70 text-center py-8">Nessuna foto caricata</p>
@@ -197,8 +197,8 @@ export default async function EventDashboardPage({ params }: PageProps) {
 
     if (error.message === 'You do not have access to this event') {
       return (
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-          <div className="bg-white shadow rounded-lg p-8 max-w-md">
+        <div className="min-h-screen bg-gradient-to-br from-primary/5 via-white to-secondary/5 dark:from-[#0B0B0C] dark:via-[#111827] dark:to-[#0B0B0C] flex items-center justify-center">
+          <div className="bg-white dark:bg-gray-900 shadow rounded-lg p-8 max-w-md border border-gray-200 dark:border-gray-800">
             <h1 className="text-2xl font-bold text-red-600 mb-4">Accesso Negato</h1>
             <p className="text-brandInk mb-4">
               Non hai i permessi per accedere a questo evento.
@@ -216,8 +216,8 @@ export default async function EventDashboardPage({ params }: PageProps) {
 
     if (error.message === 'Event not found') {
       return (
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-          <div className="bg-white shadow rounded-lg p-8 max-w-md">
+        <div className="min-h-screen bg-gradient-to-br from-primary/5 via-white to-secondary/5 dark:from-[#0B0B0C] dark:via-[#111827] dark:to-[#0B0B0C] flex items-center justify-center">
+          <div className="bg-white dark:bg-gray-900 shadow rounded-lg p-8 max-w-md border border-gray-200 dark:border-gray-800">
             <h1 className="text-2xl font-bold text-brandBlack mb-4">Evento Non Trovato</h1>
             <p className="text-brandInk mb-4">
               L'evento che stai cercando non esiste o è stato eliminato.
@@ -235,8 +235,8 @@ export default async function EventDashboardPage({ params }: PageProps) {
 
     // Generic error
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="bg-white shadow rounded-lg p-8 max-w-md">
+      <div className="min-h-screen bg-gradient-to-br from-primary/5 via-white to-secondary/5 dark:from-[#0B0B0C] dark:via-[#111827] dark:to-[#0B0B0C] flex items-center justify-center">
+        <div className="bg-white dark:bg-gray-900 shadow rounded-lg p-8 max-w-md border border-gray-200 dark:border-gray-800">
           <h1 className="text-2xl font-bold text-red-600 mb-4">Errore</h1>
           <p className="text-brandInk mb-4">
             Si è verificato un errore nel caricamento della dashboard.

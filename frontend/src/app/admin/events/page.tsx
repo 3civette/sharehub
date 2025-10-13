@@ -140,7 +140,7 @@ export default function AdminEventsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-white to-secondary/5">
+    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-white to-secondary/5 dark:from-[#0B0B0C] dark:via-[#111827] dark:to-[#0B0B0C]">
       <AdminHeader
         title="Gestione Eventi"
         subtitle="Visualizza e gestisci tutti i tuoi eventi"
@@ -182,7 +182,7 @@ export default function AdminEventsPage() {
           </div>
         )}
 
-        <div className="bg-white rounded-lg shadow-md p-6">
+        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-800">
           <EventList
             events={events}
             onEventClick={handleEventClick}

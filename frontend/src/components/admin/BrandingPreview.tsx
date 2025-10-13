@@ -19,12 +19,12 @@ export default function BrandingPreview({
 }: BrandingPreviewProps) {
   return (
     <div className="space-y-4">
-      <label className="block text-sm font-medium text-gray-700">
+      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
         Live Preview
       </label>
 
       <div
-        className="p-6 border-2 border-gray-200 rounded-lg bg-white"
+        className="p-6 border-2 border-gray-800 rounded-lg bg-gray-900"
         style={{
           '--color-primary': primaryColor,
           '--color-secondary': secondaryColor
@@ -59,7 +59,7 @@ export default function BrandingPreview({
             Welcome to Your Dashboard
           </h3>
 
-          <p className="text-gray-600 text-sm">
+          <p className="text-gray-400 text-sm">
             This is how your branding will appear across the admin panel and attendee-facing pages.
           </p>
 
@@ -72,34 +72,34 @@ export default function BrandingPreview({
           </button>
 
           {/* Sample card */}
-          <div className="border border-gray-200 rounded-md p-4">
+          <div className="border border-gray-700 rounded-md p-4 bg-gray-800">
             <div className="flex items-center gap-2 mb-2">
               <div
                 className="w-3 h-3 rounded-full"
                 style={{ backgroundColor: primaryColor }}
               />
-              <span className="text-sm font-medium text-gray-700">
+              <span className="text-sm font-medium text-gray-200">
                 Event Card
               </span>
             </div>
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-gray-400">
               Your events will use these colors for visual elements.
             </p>
           </div>
         </div>
 
         {/* Color indicators */}
-        <div className="mt-4 pt-4 border-t border-gray-200 flex gap-4 text-xs text-gray-500">
+        <div className="mt-4 pt-4 border-t border-gray-700 flex gap-4 text-xs text-gray-400">
           <div className="flex items-center gap-2">
             <div
-              className="w-4 h-4 rounded border border-gray-300"
+              className="w-4 h-4 rounded border border-gray-600"
               style={{ backgroundColor: primaryColor }}
             />
             <span>Primary: {primaryColor}</span>
           </div>
           <div className="flex items-center gap-2">
             <div
-              className="w-4 h-4 rounded border border-gray-300"
+              className="w-4 h-4 rounded border border-gray-600"
               style={{ backgroundColor: secondaryColor }}
             />
             <span>Secondary: {secondaryColor}</span>

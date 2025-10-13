@@ -81,17 +81,18 @@ export default function DashboardPage() {
         }
 
         // Get last activity timestamp
-        const { data: lastActivity, error: activityError } = await supabase
+        const { data: lastActivityData, error: activityError } = await supabase
           .from('activity_logs')
           .select('timestamp')
           .eq('tenant_id', adminData.tenant_id)
           .order('timestamp', { ascending: false })
-          .limit(1)
-          .single();
+          .limit(1);
 
-        if (activityError && activityError.code !== 'PGRST116') {
+        if (activityError) {
           console.error('Error fetching last activity:', activityError);
         }
+
+        const lastActivity = lastActivityData && lastActivityData.length > 0 ? lastActivityData[0] : null;
 
         setMetrics({
           active_events_count: activeEventsCount || 0,
@@ -156,11 +157,6 @@ export default function DashboardPage() {
     return `${days} giorn${days === 1 ? 'o' : 'i'} fa`;
   };
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    router.push('/');
-  };
-
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -193,27 +189,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <>
-      {/* Header */}
-      <header className="bg-white/80 dark:bg-[#0B0B0C]/95 backdrop-blur-sm shadow-sm border-b border-brandSilver/30 dark:border-[#374151]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-brandBlack dark:text-white">Dashboard</h1>
-              <p className="text-sm text-brandInk/70 dark:text-[#E5E7EB] mt-1">Panoramica del tuo account Meeting Hub</p>
-            </div>
-            <button
-              onClick={handleLogout}
-              className="px-4 py-2 text-sm font-medium text-brandInk dark:text-[#E5E7EB] bg-white dark:bg-[#111827] border border-brandSilver dark:border-[#374151] rounded-lg hover:bg-bgSoft dark:hover:bg-[#1F2937] active:scale-95 transition-all"
-            >
-              Esci
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Metrics */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
           <MetricCard
@@ -240,9 +216,8 @@ export default function DashboardPage() {
           <UpcomingEvents />
         </div>
 
-        {/* Recent Activity */}
-        <ActivityLog activities={activities} />
-      </main>
-    </>
+      {/* Recent Activity */}
+      <ActivityLog activities={activities} />
+    </main>
   );
 }

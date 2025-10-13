@@ -27,6 +27,7 @@ interface EventCreateInput {
   title: string;
   organizer?: string;
   date: string;
+  end_date?: string;
   description?: string;
   visibility: 'public' | 'private';
 }
@@ -36,6 +37,7 @@ interface EventUpdateInput {
   title?: string;
   organizer?: string;
   date?: string;
+  end_date?: string;
   description?: string;
   visibility?: 'public' | 'private';
 }
@@ -61,6 +63,9 @@ export default function EventForm({
     description: initialData?.description || '',
     visibility: (initialData?.visibility || 'public') as 'public' | 'private'
   });
+
+  const [isMultiDay, setIsMultiDay] = useState(false);
+  const [endDate, setEndDate] = useState('');
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
@@ -113,6 +118,19 @@ export default function EventForm({
         today.setHours(0, 0, 0, 0);
         if (selectedDate < today) {
           return 'Event date must be today or in the future';
+        }
+        return null;
+
+      case 'endDate':
+        if (isMultiDay && !value) {
+          return 'La data di fine è richiesta per eventi multi-giorno';
+        }
+        if (isMultiDay && value && formData.date) {
+          const start = new Date(formData.date);
+          const end = new Date(value);
+          if (end < start) {
+            return 'La data di fine deve essere successiva alla data di inizio';
+          }
         }
         return null;
 
@@ -174,11 +192,22 @@ export default function EventForm({
       }
     });
 
+    // Validate endDate if multi-day
+    if (isMultiDay) {
+      const endDateError = validateField('endDate', endDate);
+      if (endDateError) {
+        newErrors.endDate = endDateError;
+      }
+    }
+
     // Mark all fields as touched
     const allTouched: Record<string, boolean> = {};
     Object.keys(formData).forEach((key) => {
       allTouched[key] = true;
     });
+    if (isMultiDay) {
+      allTouched.endDate = true;
+    }
     setTouched(allTouched);
 
     if (Object.keys(newErrors).length > 0) {
@@ -192,6 +221,7 @@ export default function EventForm({
       title: formData.title,
       organizer: formData.organizer || undefined,
       date: formData.date,
+      end_date: isMultiDay ? endDate : undefined,
       description: formData.description || undefined,
       visibility: formData.visibility
     };
@@ -208,7 +238,7 @@ export default function EventForm({
     <form onSubmit={handleSubmit} className="space-y-6">
       {/* Event Name */}
       <div>
-        <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+        <label htmlFor="name" className="block text-sm font-medium !text-gray-900">
           Event Name (slug) *
         </label>
         <input
@@ -219,25 +249,25 @@ export default function EventForm({
           onChange={handleChange}
           onBlur={handleBlur}
           disabled={isReadOnly}
-          className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+          className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
             errors.name && touched.name
               ? 'border-red-500'
               : 'border-gray-300'
           } ${isReadOnly ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-          placeholder="Enter event slug"
+          placeholder="Inserisci lo slug dell'evento"
           maxLength={255}
         />
         {errors.name && touched.name && (
           <p className="mt-1 text-sm text-red-600">{errors.name}</p>
         )}
-        <p className="mt-1 text-xs text-gray-500">
+        <p className="mt-1 text-xs text-brandInk/70 dark:text-gray-400">
           Usato per l'URL (es: /events/meeting-2025)
         </p>
       </div>
 
       {/* Title */}
       <div>
-        <label htmlFor="title" className="block text-sm font-medium text-gray-700">
+        <label htmlFor="title" className="block text-sm font-medium !text-gray-900">
           Titolo *
         </label>
         <input
@@ -248,7 +278,7 @@ export default function EventForm({
           onChange={handleChange}
           onBlur={handleBlur}
           disabled={isReadOnly}
-          className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+          className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
             errors.title && touched.title
               ? 'border-red-500'
               : 'border-gray-300'
@@ -263,7 +293,7 @@ export default function EventForm({
 
       {/* Organizer */}
       <div>
-        <label htmlFor="organizer" className="block text-sm font-medium text-gray-700">
+        <label htmlFor="organizer" className="block text-sm font-medium !text-gray-900">
           Organizzatore
         </label>
         <input
@@ -274,7 +304,7 @@ export default function EventForm({
           onChange={handleChange}
           onBlur={handleBlur}
           disabled={isReadOnly}
-          className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+          className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
             errors.organizer && touched.organizer
               ? 'border-red-500'
               : 'border-gray-300'
@@ -289,8 +319,8 @@ export default function EventForm({
 
       {/* Event Date */}
       <div>
-        <label htmlFor="date" className="block text-sm font-medium text-gray-700">
-          Event Date *
+        <label htmlFor="date" className="block text-sm font-medium !text-gray-900">
+          Data Inizio *
         </label>
         <input
           type="date"
@@ -301,7 +331,7 @@ export default function EventForm({
           onBlur={handleBlur}
           disabled={isReadOnly}
           min={getTodayDate()}
-          className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+          className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 ${
             errors.date && touched.date
               ? 'border-red-500'
               : 'border-gray-300'
@@ -312,10 +342,63 @@ export default function EventForm({
         )}
       </div>
 
+      {/* Multi-day checkbox */}
+      <div>
+        <label className="flex items-center">
+          <input
+            type="checkbox"
+            checked={isMultiDay}
+            onChange={(e) => setIsMultiDay(e.target.checked)}
+            disabled={isReadOnly}
+            className="mr-2 h-4 w-4 text-primary focus:ring-2 focus:ring-primary border-gray-300 rounded"
+          />
+          <span className="text-sm !text-gray-900">
+            Evento su più giorni
+          </span>
+        </label>
+      </div>
+
+      {/* End Date (only if multi-day) */}
+      {isMultiDay && (
+        <div>
+          <label htmlFor="endDate" className="block text-sm font-medium !text-gray-900">
+            Data Fine *
+          </label>
+          <input
+            type="date"
+            id="endDate"
+            name="endDate"
+            value={endDate}
+            onChange={(e) => {
+              setEndDate(e.target.value);
+              if (touched.endDate) {
+                const error = validateField('endDate', e.target.value);
+                setErrors((prev) => ({ ...prev, endDate: error || '' }));
+              }
+            }}
+            onBlur={(e) => {
+              setTouched((prev) => ({ ...prev, endDate: true }));
+              const error = validateField('endDate', e.target.value);
+              setErrors((prev) => ({ ...prev, endDate: error || '' }));
+            }}
+            disabled={isReadOnly}
+            min={formData.date || getTodayDate()}
+            className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+              errors.endDate && touched.endDate
+                ? 'border-red-500'
+                : 'border-gray-300'
+            } ${isReadOnly ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+          />
+          {errors.endDate && touched.endDate && (
+            <p className="mt-1 text-sm text-red-600">{errors.endDate}</p>
+          )}
+        </div>
+      )}
+
       {/* Description */}
       <div>
-        <label htmlFor="description" className="block text-sm font-medium text-gray-700">
-          Description
+        <label htmlFor="description" className="block text-sm font-medium !text-gray-900">
+          Descrizione
         </label>
         <textarea
           id="description"
@@ -325,20 +408,20 @@ export default function EventForm({
           onBlur={handleBlur}
           disabled={isReadOnly}
           rows={4}
-          className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+          className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
             errors.description && touched.description
               ? 'border-red-500'
               : 'border-gray-300'
           } ${isReadOnly ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-          placeholder="Enter event description (optional)"
+          placeholder="Inserisci la descrizione dell'evento (opzionale)"
           maxLength={2000}
         />
         <div className="flex justify-between mt-1">
           {errors.description && touched.description ? (
             <p className="text-sm text-red-600">{errors.description}</p>
           ) : (
-            <p className="text-xs text-gray-500">
-              {formData.description.length}/2000 characters
+            <p className="text-xs text-brandInk/70 dark:text-gray-400">
+              {formData.description.length}/2000 caratteri
             </p>
           )}
         </div>
@@ -346,8 +429,8 @@ export default function EventForm({
 
       {/* Visibility */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Visibility *
+        <label className="block text-sm font-medium !text-gray-900 mb-2">
+          Visibilità *
         </label>
         <div className="flex gap-4">
           <label className="flex items-center">
@@ -360,8 +443,8 @@ export default function EventForm({
               disabled={isReadOnly}
               className="mr-2 focus:ring-2 focus:ring-blue-500"
             />
-            <span className={`text-sm ${isReadOnly ? 'text-gray-500' : 'text-gray-700'}`}>
-              Public
+            <span className={`text-sm ${isReadOnly ? 'text-gray-500' : '!text-gray-900'}`}>
+              Pubblico
             </span>
           </label>
           <label className="flex items-center">
@@ -374,23 +457,23 @@ export default function EventForm({
               disabled={isReadOnly}
               className="mr-2 focus:ring-2 focus:ring-blue-500"
             />
-            <span className={`text-sm ${isReadOnly ? 'text-gray-500' : 'text-gray-700'}`}>
-              Private
+            <span className={`text-sm ${isReadOnly ? 'text-gray-500' : '!text-gray-900'}`}>
+              Privato
             </span>
           </label>
         </div>
-        <p className="mt-1 text-xs text-gray-500">
+        <p className="mt-1 text-xs text-brandInk/70 dark:text-gray-400">
           {formData.visibility === 'private'
-            ? 'Private events require tokens for access'
-            : 'Public events are accessible to all attendees'}
+            ? 'Gli eventi privati richiedono token per l\'accesso'
+            : 'Gli eventi pubblici sono accessibili a tutti i partecipanti'}
         </p>
       </div>
 
       {/* Read-only notice */}
       {isReadOnly && (
-        <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-          <p className="text-sm text-yellow-800">
-            This event cannot be edited because it has already occurred.
+        <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md">
+          <p className="text-sm text-yellow-800 dark:text-yellow-200">
+            Questo evento non può essere modificato perché è già avvenuto.
           </p>
         </div>
       )}
@@ -400,9 +483,9 @@ export default function EventForm({
         <div className="flex gap-3">
           <button
             type="submit"
-            className="flex-1 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+            className="flex-1 px-4 py-2 text-sm font-medium text-white bg-primary rounded-md hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 transition-colors shadow-button"
           >
-            {mode === 'create' ? 'Create Event' : 'Update Event'}
+            {mode === 'create' ? 'Crea Evento' : 'Aggiorna Evento'}
           </button>
         </div>
       )}

@@ -156,7 +156,7 @@ export default function EditEventPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+      <div className="min-h-screen bg-gradient-to-br from-primary/5 via-white to-secondary/5 dark:from-[#0B0B0C] dark:via-[#111827] dark:to-[#0B0B0C]">
         <header className="bg-white shadow-sm">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
             <h1 className="text-2xl font-bold text-gray-900">Caricamento...</h1>
@@ -176,7 +176,7 @@ export default function EditEventPage() {
 
   if (error && !event) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+      <div className="min-h-screen bg-gradient-to-br from-primary/5 via-white to-secondary/5 dark:from-[#0B0B0C] dark:via-[#111827] dark:to-[#0B0B0C]">
         <header className="bg-white shadow-sm">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
             <h1 className="text-2xl font-bold text-gray-900">Errore</h1>
@@ -222,7 +222,7 @@ export default function EditEventPage() {
   const isReadOnly = isPastEvent(event);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-white to-secondary/5 dark:from-[#0B0B0C] dark:via-[#111827] dark:to-[#0B0B0C]">
       <AdminHeader
         title={isReadOnly ? 'Visualizza Evento' : 'Modifica Evento'}
         subtitle={isReadOnly ? 'Questo evento è concluso e non può essere modificato' : 'Aggiorna i dettagli dell\'evento'}
@@ -239,7 +239,7 @@ export default function EditEventPage() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Action Bar - Shows for all tabs */}
         {!isReadOnly && (
-          <div className="bg-white rounded-t-lg shadow-md px-6 py-4 border-b border-gray-200">
+          <div className="bg-white dark:bg-gray-900 rounded-t-lg shadow-md px-6 py-4 border-b border-gray-200 dark:border-gray-800">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-medium text-gray-700">
@@ -268,7 +268,7 @@ export default function EditEventPage() {
         )}
 
         {/* Tabs Navigation */}
-        <div className={`bg-white ${isReadOnly ? 'rounded-t-lg' : ''} shadow-md border-b border-gray-200`}>
+        <div className={`bg-white dark:bg-gray-900 ${isReadOnly ? 'rounded-t-lg' : ''} shadow-md border-b border-gray-200 dark:border-gray-800`}>
           <nav className="flex space-x-8 px-6" aria-label="Tabs">
             <button
               onClick={() => setActiveTab('details')}
@@ -316,7 +316,7 @@ export default function EditEventPage() {
         </div>
 
         {/* Tab Content */}
-        <div className="bg-white rounded-b-lg shadow-md p-6">
+        <div className="bg-white dark:bg-gray-900 rounded-b-lg shadow-md p-6 border border-gray-200 dark:border-gray-800">
           {success && (
             <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-md">
               <div className="flex gap-3">

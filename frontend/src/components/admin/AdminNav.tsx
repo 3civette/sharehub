@@ -6,8 +6,10 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { Home, Calendar, Plus, Palette, Settings, Menu, X } from 'lucide-react';
+import { usePathname, useRouter } from 'next/navigation';
+import { Home, Calendar, Plus, Palette, Settings, Menu, X, LogOut } from 'lucide-react';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { useTenant } from '@/contexts/TenantContext';
 
 interface NavItem {
   label: string;
@@ -17,7 +19,15 @@ interface NavItem {
 
 export default function AdminNav() {
   const pathname = usePathname();
+  const router = useRouter();
+  const supabase = createClientComponentClient();
+  const { tenant } = useTenant();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.push('/');
+  };
 
   const navItems: NavItem[] = [
     {
@@ -37,7 +47,7 @@ export default function AdminNav() {
     },
     {
       label: 'Pubblicità',
-      href: '/admin/branding',
+      href: '/admin/pubblicita',
       icon: <Palette className="w-5 h-5" />
     },
     {
@@ -82,26 +92,48 @@ export default function AdminNav() {
             </div>
 
             {/* Desktop Navigation */}
-            <div className="hidden lg:flex space-x-8">
-              {navItems.map((item) => {
-                const active = isActive(item.href);
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={`flex items-center gap-2 py-4 px-3 border-b-2 text-sm font-medium transition-all duration-150 whitespace-nowrap
-                      active:scale-95 active:shadow-inner
-                      ${
-                        active
-                          ? 'border-primary text-primary dark:text-primary bg-primary/10 dark:bg-primary/20 shadow-sm'
-                          : 'border-transparent text-[#111827] dark:text-[#E5E7EB] hover:text-[#0B0B0C] dark:hover:text-white hover:border-primary/30 hover:bg-primary/5 dark:hover:bg-primary/10 hover:shadow-sm'
-                      }`}
-                  >
-                    {item.icon}
-                    {item.label}
-                  </Link>
-                );
-              })}
+            <div className="hidden lg:flex items-center flex-1 justify-between">
+              <div className="flex items-center space-x-8">
+                {navItems.map((item) => {
+                  const active = isActive(item.href);
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={`flex items-center gap-2 py-4 px-3 border-b-2 text-sm font-medium transition-all duration-150 whitespace-nowrap
+                        active:scale-95 active:shadow-inner
+                        ${
+                          active
+                            ? 'border-primary text-primary dark:text-primary bg-primary/10 dark:bg-primary/20 shadow-sm'
+                            : 'border-transparent text-[#111827] dark:text-[#E5E7EB] hover:text-[#0B0B0C] dark:hover:text-white hover:border-primary/30 hover:bg-primary/5 dark:hover:bg-primary/10 hover:shadow-sm'
+                        }`}
+                    >
+                      {item.icon}
+                      {item.label}
+                    </Link>
+                  );
+                })}
+              </div>
+
+              <div className="flex items-center gap-3">
+                {/* Hotel Name */}
+                {tenant?.hotel_name && (
+                  <span className="text-sm font-semibold text-[#111827] dark:text-white whitespace-nowrap">
+                    {tenant.hotel_name}
+                  </span>
+                )}
+
+                {/* Logout Button */}
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center gap-2 py-2 px-4 text-sm font-medium text-[#111827] dark:text-[#E5E7EB]
+                    bg-white dark:bg-[#111827] border border-[#E5E7EB] dark:border-[#374151] rounded-lg
+                    hover:bg-gray-50 dark:hover:bg-[#1F2937] active:scale-95 transition-all whitespace-nowrap"
+                >
+                  <LogOut className="w-4 h-4" />
+                  Esci
+                </button>
+              </div>
             </div>
 
             {/* Burger Menu Button - Mobile Only */}
@@ -133,7 +165,7 @@ export default function AdminNav() {
 
       {/* Mobile Sidebar */}
       <div
-        className={`fixed top-0 right-0 h-full w-64 bg-white dark:bg-[#0B0B0C] shadow-2xl z-50 transform transition-transform duration-300 ease-in-out lg:hidden border-l border-[#E5E7EB] dark:border-[#374151] ${
+        className={`fixed top-0 right-0 h-full w-64 bg-white dark:bg-[#0B0B0C] shadow-2xl z-50 transform transition-transform duration-300 ease-in-out lg:hidden border-l border-[#E5E7EB] dark:border-[#374151] flex flex-col ${
           isSidebarOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
@@ -153,7 +185,7 @@ export default function AdminNav() {
         </div>
 
         {/* Sidebar Navigation Items */}
-        <div className="py-4">
+        <div className="py-4 flex-1">
           {navItems.map((item) => {
             const active = isActive(item.href);
             return (
@@ -173,6 +205,28 @@ export default function AdminNav() {
               </Link>
             );
           })}
+        </div>
+
+        {/* Hotel Name and Logout - Mobile */}
+        <div className="border-t border-[#E5E7EB] dark:border-[#374151] p-4">
+          {/* Hotel Name */}
+          {tenant?.hotel_name && (
+            <div className="px-2 py-3 text-sm font-semibold text-[#111827] dark:text-white">
+              {tenant.hotel_name}
+            </div>
+          )}
+
+          {/* Logout Button */}
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center gap-3 px-4 py-3 text-base font-medium
+              text-[#111827] dark:text-[#E5E7EB]
+              bg-white dark:bg-[#111827] border border-[#E5E7EB] dark:border-[#374151] rounded-lg
+              hover:bg-gray-50 dark:hover:bg-[#1F2937] active:scale-95 transition-all"
+          >
+            <LogOut className="w-5 h-5" />
+            Esci
+          </button>
         </div>
       </div>
     </>

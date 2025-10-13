@@ -46,7 +46,7 @@ export default async function SlidesUploadPage({ params }: PageProps) {
     const speech = await response.json();
 
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gradient-to-br from-primary/5 via-white to-secondary/5 dark:from-[#0B0B0C] dark:via-[#111827] dark:to-[#0B0B0C]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           {/* Back Navigation */}
           <div className="mb-6">
@@ -77,8 +77,8 @@ export default async function SlidesUploadPage({ params }: PageProps) {
   } catch (error: any) {
     console.error('Slides page error:', error);
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="bg-white shadow rounded-lg p-8 max-w-md">
+      <div className="min-h-screen bg-gradient-to-br from-primary/5 via-white to-secondary/5 dark:from-[#0B0B0C] dark:via-[#111827] dark:to-[#0B0B0C] flex items-center justify-center">
+        <div className="bg-white dark:bg-gray-900 shadow rounded-lg p-8 max-w-md border border-gray-200 dark:border-gray-800">
           <h1 className="text-2xl font-bold text-red-600 mb-4">Errore</h1>
           <p className="text-brandInk mb-4">
             Impossibile caricare la pagina di upload slide.

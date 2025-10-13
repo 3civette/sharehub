@@ -108,7 +108,7 @@ export default function NewEventPage() {
   // Show tokens screen after creating private event
   if (tokens) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-primary/5 via-white to-secondary/5">
+      <div className="min-h-screen bg-gradient-to-br from-primary/5 via-white to-secondary/5 dark:from-[#0B0B0C] dark:via-[#111827] dark:to-[#0B0B0C]">
         <header className="bg-white shadow-sm">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
             <h1 className="text-2xl font-bold text-brandBlack">Evento Creato con Successo!</h1>
@@ -202,7 +202,7 @@ export default function NewEventPage() {
 
   // Show event form
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-white to-secondary/5">
+    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-white to-secondary/5 dark:from-[#0B0B0C] dark:via-[#111827] dark:to-[#0B0B0C]">
       <AdminHeader
         title="Crea Nuovo Evento"
         subtitle="Compila i dettagli per creare un nuovo evento"
