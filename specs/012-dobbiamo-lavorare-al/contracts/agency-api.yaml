@@ -1,0 +1,562 @@
+openapi: 3.0.3
+info:
+  title: Meeting Hub - Agency Management API
+  version: 1.0.0
+  description: |
+    REST API for MICE agency registration, profile management, and logo uploads.
+    Part of the Meeting Hub B2B SaaS platform.
+  contact:
+    name: 3Civette Development Team
+    email: dev@3civette.com
+
+servers:
+  - url: https://meeting-hub.netlify.app/api
+    description: Production
+  - url: http://localhost:3000/api
+    description: Local Development
+
+tags:
+  - name: Agencies
+    description: Agency account management
+
+paths:
+  /agencies/signup:
+    post:
+      operationId: createAgency
+      tags:
+        - Agencies
+      summary: Register a new MICE agency
+      description: |
+        Creates a new agency account with FREE tier subscription (3 events).
+        Email must be unique. Password is bcrypt hashed server-side.
+        Immediately activates account (no email verification required).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgencySignupRequest'
+            examples:
+              minimal:
+                summary: Minimal signup (required fields only)
+                value:
+                  company_name: "MICE Events Inc"
+                  contact_email: "admin@miceevents.com"
+                  password: "SecurePass123!"
+              complete:
+                summary: Complete signup (all optional fields)
+                value:
+                  company_name: "MICE Events Inc"
+                  contact_email: "admin@miceevents.com"
+                  password: "SecurePass123!"
+                  phone: "+393451234567"
+                  vat_number: "IT12345678901"
+      responses:
+        '201':
+          description: Agency created successfully
+          headers:
+            Location:
+              description: URL to the created agency profile
+              schema:
+                type: string
+                example: /api/agencies/profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgencySignupResponse'
+              examples:
+                success:
+                  value:
+                    agency_id: "550e8400-e29b-41d4-a716-446655440000"
+                    company_name: "MICE Events Inc"
+                    contact_email: "admin@miceevents.com"
+                    subscription:
+                      tier: "free"
+                      event_limit: 3
+                      current_event_count: 0
+                      status: "active"
+                    created_at: "2025-10-14T10:30:00Z"
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalid_email:
+                  value:
+                    error: "VALIDATION_ERROR"
+                    message: "Invalid email format"
+                    details:
+                      field: "contact_email"
+                      value: "not-an-email"
+                weak_password:
+                  value:
+                    error: "VALIDATION_ERROR"
+                    message: "Password must be at least 8 characters with 1 uppercase, 1 lowercase, and 1 number"
+                    details:
+                      field: "password"
+                short_company_name:
+                  value:
+                    error: "VALIDATION_ERROR"
+                    message: "Company name must be 2-100 characters"
+                    details:
+                      field: "company_name"
+                      value: "A"
+        '409':
+          description: Conflict - Email already registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                duplicate_email:
+                  value:
+                    error: "EMAIL_EXISTS"
+                    message: "An agency with this email already exists"
+                    details:
+                      contact_email: "admin@miceevents.com"
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /agencies/profile:
+    get:
+      operationId: getAgencyProfile
+      tags:
+        - Agencies
+      summary: Get current agency profile
+      description: Returns the authenticated agency's profile information
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Agency profile retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgencyProfile'
+              examples:
+                complete_profile:
+                  value:
+                    id: "550e8400-e29b-41d4-a716-446655440000"
+                    company_name: "MICE Events Inc"
+                    contact_email: "admin@miceevents.com"
+                    phone: "+393451234567"
+                    vat_number: "IT12345678901"
+                    address: "Via Roma 123, Milano, Italy"
+                    logo_url: "https://supabase.co/storage/v1/object/public/logos/550e8400/logo.png"
+                    created_at: "2025-10-14T10:30:00Z"
+                    updated_at: "2025-10-14T15:45:00Z"
+                minimal_profile:
+                  value:
+                    id: "660e8400-e29b-41d4-a716-446655440001"
+                    company_name: "Quick Events"
+                    contact_email: "info@quickevents.com"
+                    phone: null
+                    vat_number: null
+                    address: null
+                    logo_url: null
+                    created_at: "2025-10-14T12:00:00Z"
+                    updated_at: "2025-10-14T12:00:00Z"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    patch:
+      operationId: updateAgencyProfile
+      tags:
+        - Agencies
+      summary: Update agency profile
+      description: |
+        Updates agency profile fields. Only provided fields are updated.
+        Cannot update contact_email or password (use dedicated endpoints).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgencyUpdateRequest'
+            examples:
+              update_company_info:
+                summary: Update company name and phone
+                value:
+                  company_name: "MICE Events Italia S.r.l."
+                  phone: "+393459876543"
+              add_vat_and_address:
+                summary: Add VAT number and address
+                value:
+                  vat_number: "IT98765432101"
+                  address: "Corso Venezia 45, 20121 Milano, Italy"
+              update_single_field:
+                summary: Update only company name
+                value:
+                  company_name: "MICE Events Italia"
+      responses:
+        '200':
+          description: Profile updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgencyProfile'
+              examples:
+                success:
+                  value:
+                    id: "550e8400-e29b-41d4-a716-446655440000"
+                    company_name: "MICE Events Italia S.r.l."
+                    contact_email: "admin@miceevents.com"
+                    phone: "+393459876543"
+                    vat_number: "IT98765432101"
+                    address: "Corso Venezia 45, 20121 Milano, Italy"
+                    logo_url: "https://supabase.co/storage/v1/object/public/logos/550e8400/logo.png"
+                    created_at: "2025-10-14T10:30:00Z"
+                    updated_at: "2025-10-14T16:20:00Z"
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalid_phone:
+                  value:
+                    error: "VALIDATION_ERROR"
+                    message: "Phone number must be in E.164 format (e.g., +393451234567)"
+                    details:
+                      field: "phone"
+                      value: "123456789"
+                empty_company_name:
+                  value:
+                    error: "VALIDATION_ERROR"
+                    message: "Company name cannot be empty"
+                    details:
+                      field: "company_name"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /agencies/profile/logo:
+    post:
+      operationId: uploadAgencyLogo
+      tags:
+        - Agencies
+      summary: Upload agency logo
+      description: |
+        Uploads a logo image for the agency.
+        Replaces existing logo if present.
+        File stored in Supabase Storage with agency-scoped path.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Logo file (JPEG, PNG, or SVG)
+              required:
+                - file
+            encoding:
+              file:
+                contentType: image/jpeg, image/png, image/svg+xml
+      responses:
+        '200':
+          description: Logo uploaded successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogoUploadResponse'
+              examples:
+                success:
+                  value:
+                    logo_url: "https://supabase.co/storage/v1/object/public/logos/550e8400/1697284800-logo.png"
+                    file_size: 157824
+                    mime_type: "image/png"
+                    uploaded_at: "2025-10-14T16:30:00Z"
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalid_file_type:
+                  value:
+                    error: "INVALID_FILE_TYPE"
+                    message: "File type not allowed. Use JPEG, PNG, or SVG."
+                    details:
+                      mime_type: "image/gif"
+                      allowed_types: ["image/jpeg", "image/png", "image/svg+xml"]
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '413':
+          description: File too large
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                file_too_large:
+                  value:
+                    error: "FILE_TOO_LARGE"
+                    message: "File size exceeds 2MB limit"
+                    details:
+                      file_size: 3145728
+                      max_size: 2097152
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtained from Supabase Auth
+
+  schemas:
+    AgencySignupRequest:
+      type: object
+      required:
+        - company_name
+        - contact_email
+        - password
+      properties:
+        company_name:
+          type: string
+          minLength: 2
+          maxLength: 100
+          description: Agency legal or trading name
+          example: "MICE Events Inc"
+        contact_email:
+          type: string
+          format: email
+          description: Primary contact email (used for login)
+          example: "admin@miceevents.com"
+        password:
+          type: string
+          minLength: 8
+          format: password
+          description: Account password (min 8 chars, 1 uppercase, 1 lowercase, 1 number)
+          example: "SecurePass123!"
+        phone:
+          type: string
+          pattern: '^\+[1-9]\d{1,14}$'
+          description: Optional phone number in E.164 format
+          example: "+393451234567"
+        vat_number:
+          type: string
+          minLength: 2
+          maxLength: 50
+          description: Optional VAT/Tax ID
+          example: "IT12345678901"
+
+    AgencySignupResponse:
+      type: object
+      required:
+        - agency_id
+        - company_name
+        - contact_email
+        - subscription
+        - created_at
+      properties:
+        agency_id:
+          type: string
+          format: uuid
+          description: Unique agency identifier
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        company_name:
+          type: string
+          example: "MICE Events Inc"
+        contact_email:
+          type: string
+          format: email
+          example: "admin@miceevents.com"
+        subscription:
+          $ref: '#/components/schemas/SubscriptionInfo'
+        created_at:
+          type: string
+          format: date-time
+          description: Account creation timestamp
+          example: "2025-10-14T10:30:00Z"
+
+    AgencyProfile:
+      type: object
+      required:
+        - id
+        - company_name
+        - contact_email
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        company_name:
+          type: string
+          example: "MICE Events Inc"
+        contact_email:
+          type: string
+          format: email
+          example: "admin@miceevents.com"
+        phone:
+          type: string
+          nullable: true
+          example: "+393451234567"
+        vat_number:
+          type: string
+          nullable: true
+          example: "IT12345678901"
+        address:
+          type: string
+          nullable: true
+          example: "Via Roma 123, Milano, Italy"
+        logo_url:
+          type: string
+          format: uri
+          nullable: true
+          example: "https://supabase.co/storage/v1/object/public/logos/550e8400/logo.png"
+        created_at:
+          type: string
+          format: date-time
+          example: "2025-10-14T10:30:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          example: "2025-10-14T15:45:00Z"
+
+    AgencyUpdateRequest:
+      type: object
+      properties:
+        company_name:
+          type: string
+          minLength: 2
+          maxLength: 100
+          example: "MICE Events Italia S.r.l."
+        phone:
+          type: string
+          pattern: '^\+[1-9]\d{1,14}$'
+          example: "+393459876543"
+        vat_number:
+          type: string
+          minLength: 2
+          maxLength: 50
+          example: "IT98765432101"
+        address:
+          type: string
+          maxLength: 500
+          example: "Corso Venezia 45, 20121 Milano, Italy"
+
+    LogoUploadResponse:
+      type: object
+      required:
+        - logo_url
+        - file_size
+        - mime_type
+        - uploaded_at
+      properties:
+        logo_url:
+          type: string
+          format: uri
+          description: Public URL to the uploaded logo
+          example: "https://supabase.co/storage/v1/object/public/logos/550e8400/1697284800-logo.png"
+        file_size:
+          type: integer
+          description: File size in bytes
+          example: 157824
+        mime_type:
+          type: string
+          enum: [image/jpeg, image/png, image/svg+xml]
+          example: "image/png"
+        uploaded_at:
+          type: string
+          format: date-time
+          example: "2025-10-14T16:30:00Z"
+
+    SubscriptionInfo:
+      type: object
+      required:
+        - tier
+        - event_limit
+        - current_event_count
+        - status
+      properties:
+        tier:
+          type: string
+          enum: [free, basic, professional, enterprise]
+          description: Subscription tier
+          example: "free"
+        event_limit:
+          type: integer
+          description: Maximum events allowed (-1 = unlimited)
+          example: 3
+        current_event_count:
+          type: integer
+          description: Current number of active events
+          example: 0
+        status:
+          type: string
+          enum: [active, suspended, cancelled]
+          description: Subscription status
+          example: "active"
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+          description: Machine-readable error code
+          example: "VALIDATION_ERROR"
+        message:
+          type: string
+          description: Human-readable error message
+          example: "Invalid email format"
+        details:
+          type: object
+          description: Additional error context (field-specific errors, etc.)
+          additionalProperties: true
+          example:
+            field: "contact_email"
+            value: "not-an-email"
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid authentication token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            missing_token:
+              value:
+                error: "UNAUTHORIZED"
+                message: "Authentication token required"
+            invalid_token:
+              value:
+                error: "UNAUTHORIZED"
+                message: "Invalid or expired authentication token"
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            generic_error:
+              value:
+                error: "INTERNAL_ERROR"
+                message: "An unexpected error occurred"
+                details:
+                  request_id: "req_abc123"

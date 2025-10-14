@@ -1,0 +1,538 @@
+openapi: 3.0.3
+info:
+  title: Meeting Hub - Event Branding API
+  version: 1.0.0
+  description: |
+    REST API for customizing event visual identity (logo, 4-color palette, font preset).
+    Branding applies to public event pages only. Falls back to 3Civette defaults if not customized.
+  contact:
+    name: 3Civette Development Team
+    email: dev@3civette.com
+
+servers:
+  - url: https://meeting-hub.netlify.app/api
+    description: Production
+  - url: http://localhost:3000/api
+    description: Local Development
+
+tags:
+  - name: Branding
+    description: Event branding customization
+
+paths:
+  /events/{eventId}/branding:
+    get:
+      operationId: getEventBranding
+      tags:
+        - Branding
+      summary: Get event branding configuration
+      description: |
+        Returns the branding configuration for an event.
+        If no custom branding exists, returns 3Civette default palette.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          description: UUID of the event
+          schema:
+            type: string
+            format: uuid
+          example: "770e8400-e29b-41d4-a716-446655440000"
+      responses:
+        '200':
+          description: Branding configuration retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventBranding'
+              examples:
+                custom_branding:
+                  summary: Event with custom branding
+                  value:
+                    id: "880e8400-e29b-41d4-a716-446655440001"
+                    event_id: "770e8400-e29b-41d4-a716-446655440000"
+                    logo_url: "https://supabase.co/storage/v1/object/public/logos/event-770e8400.png"
+                    primary_color: "#1E40AF"
+                    secondary_color: "#9333EA"
+                    accent_color: "#EAB308"
+                    background_color: "#FFFFFF"
+                    font_family: "poppins"
+                    is_customized: true
+                    created_at: "2025-10-14T14:00:00Z"
+                    updated_at: "2025-10-14T15:30:00Z"
+                default_branding:
+                  summary: Event with default 3Civette branding
+                  value:
+                    id: null
+                    event_id: "880e8400-e29b-41d4-a716-446655440002"
+                    logo_url: null
+                    primary_color: "#2563EB"
+                    secondary_color: "#7C3AED"
+                    accent_color: "#F59E0B"
+                    background_color: "#F8FAFC"
+                    font_family: "inter"
+                    is_customized: false
+                    created_at: null
+                    updated_at: null
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Forbidden - Event does not belong to authenticated agency
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                forbidden:
+                  value:
+                    error: "FORBIDDEN"
+                    message: "You do not have access to this event"
+                    details:
+                      event_id: "770e8400-e29b-41d4-a716-446655440000"
+        '404':
+          description: Event not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                not_found:
+                  value:
+                    error: "EVENT_NOT_FOUND"
+                    message: "Event not found"
+                    details:
+                      event_id: "990e8400-e29b-41d4-a716-446655440099"
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    put:
+      operationId: updateEventBranding
+      tags:
+        - Branding
+      summary: Update event branding configuration
+      description: |
+        Creates or updates branding configuration for an event.
+        Only provided fields are updated (partial updates supported).
+        Color validation ensures valid hex format.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          description: UUID of the event
+          schema:
+            type: string
+            format: uuid
+          example: "770e8400-e29b-41d4-a716-446655440000"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BrandingUpdateRequest'
+            examples:
+              update_colors_only:
+                summary: Update only color palette
+                value:
+                  primary_color: "#1E40AF"
+                  secondary_color: "#9333EA"
+                  accent_color: "#EAB308"
+                  background_color: "#FFFFFF"
+              update_font_only:
+                summary: Update only font family
+                value:
+                  font_family: "merriweather"
+              update_all_except_logo:
+                summary: Update colors and font (logo via separate endpoint)
+                value:
+                  primary_color: "#0F172A"
+                  secondary_color: "#334155"
+                  accent_color: "#3B82F6"
+                  background_color: "#F1F5F9"
+                  font_family: "roboto"
+              reset_to_defaults:
+                summary: Reset to 3Civette defaults
+                value:
+                  primary_color: "#2563EB"
+                  secondary_color: "#7C3AED"
+                  accent_color: "#F59E0B"
+                  background_color: "#F8FAFC"
+                  font_family: "inter"
+      responses:
+        '200':
+          description: Branding updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventBranding'
+              examples:
+                success:
+                  value:
+                    id: "880e8400-e29b-41d4-a716-446655440001"
+                    event_id: "770e8400-e29b-41d4-a716-446655440000"
+                    logo_url: "https://supabase.co/storage/v1/object/public/logos/event-770e8400.png"
+                    primary_color: "#1E40AF"
+                    secondary_color: "#9333EA"
+                    accent_color: "#EAB308"
+                    background_color: "#FFFFFF"
+                    font_family: "poppins"
+                    is_customized: true
+                    created_at: "2025-10-14T14:00:00Z"
+                    updated_at: "2025-10-14T16:45:00Z"
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalid_color_format:
+                  value:
+                    error: "VALIDATION_ERROR"
+                    message: "Invalid hex color format"
+                    details:
+                      field: "primary_color"
+                      value: "blue"
+                      expected_format: "#RRGGBB"
+                invalid_font:
+                  value:
+                    error: "VALIDATION_ERROR"
+                    message: "Invalid font family"
+                    details:
+                      field: "font_family"
+                      value: "comic-sans"
+                      allowed_values: ["inter", "merriweather", "poppins", "roboto", "playfair"]
+                missing_hash:
+                  value:
+                    error: "VALIDATION_ERROR"
+                    message: "Color must start with #"
+                    details:
+                      field: "accent_color"
+                      value: "F59E0B"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/EventNotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /events/{eventId}/branding/logo:
+    post:
+      operationId: uploadEventLogo
+      tags:
+        - Branding
+      summary: Upload event logo
+      description: |
+        Uploads a custom logo for the event branding.
+        Replaces existing event logo if present.
+        Stored in Supabase Storage with event-scoped path.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          description: UUID of the event
+          schema:
+            type: string
+            format: uuid
+          example: "770e8400-e29b-41d4-a716-446655440000"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Logo file (JPEG, PNG, or SVG)
+              required:
+                - file
+            encoding:
+              file:
+                contentType: image/jpeg, image/png, image/svg+xml
+      responses:
+        '200':
+          description: Logo uploaded successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogoUploadResponse'
+              examples:
+                success:
+                  value:
+                    logo_url: "https://supabase.co/storage/v1/object/public/logos/event-770e8400-1697284800.png"
+                    file_size: 245632
+                    mime_type: "image/png"
+                    uploaded_at: "2025-10-14T17:15:00Z"
+                    branding_updated: true
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalid_file_type:
+                  value:
+                    error: "INVALID_FILE_TYPE"
+                    message: "File type not allowed. Use JPEG, PNG, or SVG."
+                    details:
+                      mime_type: "image/webp"
+                      allowed_types: ["image/jpeg", "image/png", "image/svg+xml"]
+                no_file_provided:
+                  value:
+                    error: "VALIDATION_ERROR"
+                    message: "No file provided"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/EventNotFound'
+        '413':
+          description: File too large
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                file_too_large:
+                  value:
+                    error: "FILE_TOO_LARGE"
+                    message: "File size exceeds 2MB limit"
+                    details:
+                      file_size: 3145728
+                      max_size: 2097152
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtained from Supabase Auth
+
+  schemas:
+    EventBranding:
+      type: object
+      required:
+        - event_id
+        - primary_color
+        - secondary_color
+        - accent_color
+        - background_color
+        - font_family
+        - is_customized
+      properties:
+        id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Branding config ID (null if using defaults)
+          example: "880e8400-e29b-41d4-a716-446655440001"
+        event_id:
+          type: string
+          format: uuid
+          description: Event UUID
+          example: "770e8400-e29b-41d4-a716-446655440000"
+        logo_url:
+          type: string
+          format: uri
+          nullable: true
+          description: Event logo URL (null = use 3Civette logo)
+          example: "https://supabase.co/storage/v1/object/public/logos/event-770e8400.png"
+        primary_color:
+          type: string
+          pattern: '^#[0-9A-Fa-f]{6}$'
+          description: Main brand color (hex format)
+          example: "#2563EB"
+        secondary_color:
+          type: string
+          pattern: '^#[0-9A-Fa-f]{6}$'
+          description: Complementary color (hex format)
+          example: "#7C3AED"
+        accent_color:
+          type: string
+          pattern: '^#[0-9A-Fa-f]{6}$'
+          description: Highlight/CTA color (hex format)
+          example: "#F59E0B"
+        background_color:
+          type: string
+          pattern: '^#[0-9A-Fa-f]{6}$'
+          description: Page background color (hex format)
+          example: "#F8FAFC"
+        font_family:
+          type: string
+          enum: [inter, merriweather, poppins, roboto, playfair]
+          description: Font preset
+          example: "inter"
+        is_customized:
+          type: boolean
+          description: Whether branding has been customized (false = using defaults)
+          example: true
+        created_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Branding creation timestamp (null if using defaults)
+          example: "2025-10-14T14:00:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Last update timestamp (null if using defaults)
+          example: "2025-10-14T15:30:00Z"
+
+    BrandingUpdateRequest:
+      type: object
+      properties:
+        primary_color:
+          type: string
+          pattern: '^#[0-9A-Fa-f]{6}$'
+          description: Main brand color (hex format)
+          example: "#1E40AF"
+        secondary_color:
+          type: string
+          pattern: '^#[0-9A-Fa-f]{6}$'
+          description: Complementary color (hex format)
+          example: "#9333EA"
+        accent_color:
+          type: string
+          pattern: '^#[0-9A-Fa-f]{6}$'
+          description: Highlight/CTA color (hex format)
+          example: "#EAB308"
+        background_color:
+          type: string
+          pattern: '^#[0-9A-Fa-f]{6}$'
+          description: Page background color (hex format)
+          example: "#FFFFFF"
+        font_family:
+          type: string
+          enum: [inter, merriweather, poppins, roboto, playfair]
+          description: Font preset
+          example: "poppins"
+
+    LogoUploadResponse:
+      type: object
+      required:
+        - logo_url
+        - file_size
+        - mime_type
+        - uploaded_at
+        - branding_updated
+      properties:
+        logo_url:
+          type: string
+          format: uri
+          description: Public URL to the uploaded logo
+          example: "https://supabase.co/storage/v1/object/public/logos/event-770e8400-1697284800.png"
+        file_size:
+          type: integer
+          description: File size in bytes
+          example: 245632
+        mime_type:
+          type: string
+          enum: [image/jpeg, image/png, image/svg+xml]
+          description: File MIME type
+          example: "image/png"
+        uploaded_at:
+          type: string
+          format: date-time
+          description: Upload timestamp
+          example: "2025-10-14T17:15:00Z"
+        branding_updated:
+          type: boolean
+          description: Whether event_branding record was created/updated
+          example: true
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+          description: Machine-readable error code
+          example: "VALIDATION_ERROR"
+        message:
+          type: string
+          description: Human-readable error message
+          example: "Invalid hex color format"
+        details:
+          type: object
+          description: Additional error context
+          additionalProperties: true
+          example:
+            field: "primary_color"
+            value: "blue"
+            expected_format: "#RRGGBB"
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid authentication token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            missing_token:
+              value:
+                error: "UNAUTHORIZED"
+                message: "Authentication token required"
+            invalid_token:
+              value:
+                error: "UNAUTHORIZED"
+                message: "Invalid or expired authentication token"
+
+    Forbidden:
+      description: Forbidden - Event does not belong to authenticated agency
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            forbidden:
+              value:
+                error: "FORBIDDEN"
+                message: "You do not have access to this event"
+                details:
+                  event_id: "770e8400-e29b-41d4-a716-446655440000"
+
+    EventNotFound:
+      description: Event not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            not_found:
+              value:
+                error: "EVENT_NOT_FOUND"
+                message: "Event not found"
+                details:
+                  event_id: "990e8400-e29b-41d4-a716-446655440099"
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            generic_error:
+              value:
+                error: "INTERNAL_ERROR"
+                message: "An unexpected error occurred"
+                details:
+                  request_id: "req_def456"
