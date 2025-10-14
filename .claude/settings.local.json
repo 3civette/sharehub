@@ -108,7 +108,11 @@
       "Bash(for:*)",
       "Bash(do echo \"Applying $f...\")",
       "Bash(cat:*)",
-      "Bash(npx supabase db execute:*)"
+      "Bash(npx supabase db execute:*)",
+      "mcp__supabase__generate_typescript_types",
+      "Bash(do echo \"=== $file ===\")",
+      "Bash(head:*)",
+      "Read(//c/Users/KreshOS/Pictures/Screenshots/**)"
     ],
     "deny": [],
     "ask": []

@@ -5,14 +5,15 @@
 // Form for entering access token for private events
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { validateToken } from '@/services/eventClient';
 
 interface TokenFormProps {
   slug: string;
-  onSuccess: (tokenId: string) => void;
 }
 
-export default function TokenForm({ slug, onSuccess }: TokenFormProps) {
+export default function TokenForm({ slug }: TokenFormProps) {
+  const router = useRouter();
   const [token, setToken] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -37,8 +38,8 @@ export default function TokenForm({ slug, onSuccess }: TokenFormProps) {
         sessionStorage.setItem(`event-token-${slug}`, token);
         sessionStorage.setItem(`event-token-id-${slug}`, result.token_id);
 
-        // Trigger success callback (page reload or state update)
-        onSuccess(result.token_id);
+        // Redirect with token in URL
+        router.push(`/events/${slug}?token=${encodeURIComponent(token)}`);
       } else {
         setError(result.message || 'Invalid token');
       }

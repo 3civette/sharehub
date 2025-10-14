@@ -31,7 +31,7 @@ export default function SlideDownload({ slide }: SlideDownloadProps) {
 
   // Get file type icon
   const getFileIcon = () => {
-    if (slide.mime_type.includes('pdf')) {
+    if (slide.mime_type && slide.mime_type.includes('pdf')) {
       return (
         <svg className="w-5 h-5 text-red-500" fill="currentColor" viewBox="0 0 20 20">
           <path

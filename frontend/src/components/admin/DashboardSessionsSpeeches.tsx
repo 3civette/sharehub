@@ -257,6 +257,13 @@ export default function DashboardSessionsSpeeches({
     if (!speechFormData.session_id) return;
 
     try {
+      // Calculate next display_order for speeches in this session
+      const sessionSpeeches = speeches.filter(sp => sp.session_id === speechFormData.session_id);
+      const maxDisplayOrder = sessionSpeeches.length > 0
+        ? Math.max(...sessionSpeeches.map(sp => sp.display_order || 0))
+        : -1;
+      const nextDisplayOrder = maxDisplayOrder + 1;
+
       const { data: newSpeech, error } = await supabase
         .from('speeches')
         .insert({
@@ -266,6 +273,7 @@ export default function DashboardSessionsSpeeches({
           speaker_name: speechFormData.speaker_name || null,
           description: speechFormData.description || null,
           duration_minutes: speechFormData.duration ? parseInt(speechFormData.duration) : null,
+          display_order: nextDisplayOrder,
         })
         .select()
         .single();
@@ -518,17 +526,17 @@ export default function DashboardSessionsSpeeches({
                     <div className="flex gap-2 ml-4">
                       <button
                         onClick={() => startEditSession(session)}
-                        className="px-3 py-1.5 text-sm font-medium text-primary hover:text-primary/90 hover:bg-primary/10 rounded transition flex items-center gap-1"
+                        className="p-2 text-primary hover:text-primary/90 hover:bg-primary/10 rounded-lg transition flex items-center justify-center"
+                        title="Modifica sessione"
                       >
-                        <Edit className="w-4 h-4" />
-                        Modifica
+                        <Edit className="w-5 h-5" />
                       </button>
                       <button
                         onClick={() => handleDeleteSession(session.id)}
-                        className="px-3 py-1.5 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded transition flex items-center gap-1"
+                        className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition flex items-center justify-center"
+                        title="Elimina sessione"
                       >
-                        <Trash className="w-4 h-4" />
-                        Elimina
+                        <Trash className="w-5 h-5" />
                       </button>
                     </div>
                   </div>
@@ -692,7 +700,10 @@ export default function DashboardSessionsSpeeches({
                             </div>
                           ) : (
                             /* Speech Display */
-                            <div className="p-4 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border-l-4 border-purple-500 shadow-sm hover:shadow-md transition-all">
+                            <div
+                              onClick={() => window.location.href = `/admin/events/${eventId}/speeches/${speech.id}/slides`}
+                              className="p-4 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border-l-4 border-purple-500 shadow-sm hover:shadow-md transition-all cursor-pointer"
+                            >
                               <div className="flex items-start justify-between">
                                 <div className="flex-1">
                                   <div className="flex items-center gap-2">
@@ -738,14 +749,7 @@ export default function DashboardSessionsSpeeches({
                                   </div>
                                 </div>
 
-                                <div className="flex gap-2 ml-4">
-                                  <a
-                                    href={`/admin/events/${eventId}/speeches/${speech.id}/slides`}
-                                    className="p-2 text-purple-600 hover:text-purple-700 hover:bg-purple-50 rounded-lg transition flex items-center justify-center"
-                                    title="Gestisci Slide"
-                                  >
-                                    <Upload className="w-5 h-5" />
-                                  </a>
+                                <div className="flex gap-2 ml-4" onClick={(e) => e.stopPropagation()}>
                                   <button
                                     onClick={() => startEditSpeech(speech)}
                                     className="p-2 text-green-600 hover:text-green-700 hover:bg-green-50 rounded-lg transition flex items-center justify-center"

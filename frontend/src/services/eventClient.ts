@@ -1,8 +1,7 @@
 // Feature 004: Public Event Page - Client Service
 // Date: 2025-10-07
-// Service for fetching public event data from backend API
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+// Updated: Feature 011 - Migrated to Next.js internal API routes (serverless)
+// Service for fetching public event data from internal Next.js API routes
 
 export interface PublicEventResponse {
   event: {
@@ -59,7 +58,7 @@ export interface TokenValidationResponse {
 
 export interface PublicMetrics {
   page_views: number;
-  total_slide_downloads: number;
+  total_downloads: number;
 }
 
 /**
@@ -73,12 +72,13 @@ export async function fetchPublicEvent(
   slug: string,
   token?: string
 ): Promise<PublicEventResponse> {
-  const url = new URL(`/api/public/events/${slug}`, API_BASE_URL);
-  if (token) {
-    url.searchParams.set('token', token);
-  }
+  // Use absolute URL for server-side rendering, relative for client-side
+  const isServer = typeof window === 'undefined';
+  const baseUrl = isServer ? 'http://localhost:3000' : '';
+  const params = token ? `?token=${encodeURIComponent(token)}` : '';
+  const url = `${baseUrl}/api/public/events/${slug}${params}`;
 
-  const response = await fetch(url.toString(), {
+  const response = await fetch(url, {
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',
@@ -107,9 +107,10 @@ export async function validateToken(
   slug: string,
   token: string
 ): Promise<TokenValidationResponse> {
-  const url = new URL(`/api/public/events/${slug}/validate-token`, API_BASE_URL);
+  // Use relative URL for internal Next.js API route
+  const url = `/api/public/events/${slug}/validate-token`;
 
-  const response = await fetch(url.toString(), {
+  const response = await fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -134,9 +135,10 @@ export async function validateToken(
  * @returns PublicMetrics
  */
 export async function fetchPublicMetrics(slug: string): Promise<PublicMetrics> {
-  const url = new URL(`/api/public/events/${slug}/metrics`, API_BASE_URL);
+  // Use relative URL for internal Next.js API route
+  const url = `/api/public/events/${slug}/metrics`;
 
-  const response = await fetch(url.toString(), {
+  const response = await fetch(url, {
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',
@@ -159,30 +161,30 @@ export async function fetchPublicMetrics(slug: string): Promise<PublicMetrics> {
  * Get download URL for single slide
  * @param slideId Slide UUID
  * @returns Download URL
- * @deprecated Since Feature 008: Use Next.js API route /api/slides/[id]/download directly
- * @see SlideDownload component for the new implementation with presigned R2 URLs
+ * @deprecated Since Feature 008: Slides now have presigned R2 URLs in the event response
+ * @see fetchPublicEvent response which includes download_url for each slide
  */
 export function getSlideDownloadUrl(slideId: string): string {
-  // DEPRECATED: This function points to the old backend
-  // New implementation uses Next.js API route: /api/slides/[id]/download
-  // which generates presigned R2 download URLs
-  return `${API_BASE_URL}/api/public/slides/${slideId}/download`;
+  // DEPRECATED: Slides now have download URLs included in the fetchPublicEvent response
+  // Each slide object contains a download_url field with a presigned R2 URL
+  // This function is kept for backward compatibility but should not be used
+  return `/api/public/slides/${slideId}/download`;
 }
 
 /**
  * Get download URL for speech ZIP
  * @param speechId Speech UUID
- * @returns ZIP download URL
+ * @returns ZIP download URL (relative path for internal Next.js API route)
  */
 export function getSpeechZipUrl(speechId: string): string {
-  return `${API_BASE_URL}/api/public/speeches/${speechId}/download-all`;
+  return `/api/public/speeches/${speechId}/download-all`;
 }
 
 /**
  * Get download URL for session ZIP
  * @param sessionId Session UUID
- * @returns ZIP download URL
+ * @returns ZIP download URL (relative path for internal Next.js API route)
  */
 export function getSessionZipUrl(sessionId: string): string {
-  return `${API_BASE_URL}/api/public/sessions/${sessionId}/download-all`;
+  return `/api/public/sessions/${sessionId}/download-all`;
 }

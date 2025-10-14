@@ -207,10 +207,10 @@ export default function UpcomingEvents() {
               </Link>
               <Link
                 href={`/admin/events/${event.id}/edit`}
-                className="px-3 py-1.5 text-sm font-medium text-brandInk dark:text-[#E5E7EB] hover:text-brandBlack dark:hover:text-white hover:bg-bgSoft dark:hover:bg-[#0B0B0C] active:scale-95 transition-all duration-200 rounded-lg flex items-center gap-1"
+                className="p-2 text-sm font-medium text-brandInk dark:text-[#E5E7EB] hover:text-brandBlack dark:hover:text-white hover:bg-bgSoft dark:hover:bg-[#0B0B0C] active:scale-95 transition-all duration-200 rounded-lg flex items-center justify-center"
+                title="Modifica evento"
               >
-                <Edit className="w-3 h-3" />
-                Modifica
+                <Edit className="w-4 h-4" />
               </Link>
             </div>
           </div>

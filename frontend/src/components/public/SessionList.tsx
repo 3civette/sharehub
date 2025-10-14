@@ -1,3 +1,5 @@
+'use client';
+
 // Feature 004: Public Event Page - Session List Component
 // Date: 2025-10-07
 // Displays all sessions with speeches in accordion format

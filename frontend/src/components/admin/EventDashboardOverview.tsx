@@ -65,20 +65,26 @@ export default function EventDashboardOverview({ event, metrics }: EventDashboar
           )}
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-2 items-end sm:items-start">
           <a
             href={`/admin/events/${event.id}/edit`}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+            className="w-24 px-4 py-2 bg-blue-600 text-white text-center rounded-lg hover:bg-blue-700 transition"
           >
-            Modifica Evento
+            Edit
+          </a>
+          <a
+            href={`/admin/events/${event.id}/banners`}
+            className="w-24 px-4 py-2 bg-purple-600 text-white text-center rounded-lg hover:bg-purple-700 transition"
+          >
+            Banner
           </a>
           <a
             href={`/events/${event.slug}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition"
+            className="w-24 px-4 py-2 bg-gray-600 text-white text-center rounded-lg hover:bg-gray-700 transition"
           >
-            Vedi Pagina Pubblica
+            Pagina
           </a>
         </div>
       </div>

@@ -11,7 +11,7 @@ interface PublicMetricsProps {
   slug: string;
   initialMetrics: {
     page_views: number;
-    total_slide_downloads: number;
+    total_downloads: number;
   };
   polling?: boolean; // Enable live updates every 30s
 }
@@ -85,7 +85,7 @@ export default function PublicMetrics({
             d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
           />
         </svg>
-        {formatNumber(metrics.total_slide_downloads)} downloads
+        {formatNumber(metrics.total_downloads)} downloads
       </span>
     </div>
   );
