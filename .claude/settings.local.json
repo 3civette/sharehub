@@ -112,7 +112,8 @@
       "mcp__supabase__generate_typescript_types",
       "Bash(do echo \"=== $file ===\")",
       "Bash(head:*)",
-      "Read(//c/Users/KreshOS/Pictures/Screenshots/**)"
+      "Read(//c/Users/KreshOS/Pictures/Screenshots/**)",
+      "Bash(git pull:*)"
     ],
     "deny": [],
     "ask": []
