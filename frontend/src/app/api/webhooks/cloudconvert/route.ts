@@ -13,9 +13,9 @@ import {
   verifyWebhookSignature,
   getJobStatus,
 } from '@/lib/cloudconvert';
+import { getConsecutiveFailureCount } from '@/services/cloudConvertService';
 import R2 from '@/lib/r2';
 import {
-  getConsecutiveFailureCount,
   sendThumbnailFailureNotification,
   shouldSendFailureNotification,
 } from '@/services/emailNotificationService';
