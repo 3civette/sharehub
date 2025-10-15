@@ -102,10 +102,12 @@ export default function EditEventPage() {
       }
 
       // Update event via Supabase
+      // IMPORTANT: slug must be updated together with name to keep URL working
       const { data: updatedEvent, error: updateError } = await supabase
         .from('events')
         .update({
           name: data.name,
+          slug: data.name, // Keep slug in sync with name for public URL
           title: data.title,
           organizer: data.organizer,
           date: data.date,
