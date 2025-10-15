@@ -4,7 +4,7 @@
 // Date: 2025-10-08
 // Server Component for displaying public event data
 
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import EventHeader from '@/components/public/EventHeader';
 import PublicMetrics from '@/components/public/PublicMetrics';
 import SessionList from '@/components/public/SessionList';
@@ -29,6 +29,11 @@ export default async function PublicEventPage({ params, searchParams }: PageProp
   try {
     // Fetch event data (with token if provided in URL params)
     const eventData = await fetchPublicEvent(slug, token);
+
+    // If the slug in the URL doesn't match the actual event slug, redirect to the correct URL
+    if (slug !== eventData.event.slug) {
+      redirect(`/events/${eventData.event.slug}${token ? `?token=${token}` : ''}`);
+    }
 
     return (
       <div className="min-h-screen bg-gray-900">

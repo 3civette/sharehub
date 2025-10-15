@@ -6,6 +6,7 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import EventForm from '@/components/admin/EventForm';
 import TokenDisplay from '@/components/events/TokenDisplay';
 import AdminHeader from '@/components/admin/AdminHeader';
+import { slugify } from '@/lib/utils';
 
 interface TokensResponse {
   admin_token: string;
@@ -48,11 +49,8 @@ export default function NewEventPage() {
 
       console.log('Admin tenant ID:', adminData.tenant_id);
 
-      // Generate slug from event name (if name is slug-friendly, otherwise use it as is)
-      const slug = data.name
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-|-$/g, '');
+      // Generate URL-friendly slug from event name
+      const slug = slugify(data.name);
 
       // Prepare event data for Feature 003
       const eventData = {

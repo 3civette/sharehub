@@ -7,6 +7,7 @@ import EventForm from '@/components/admin/EventForm';
 import AdminHeader from '@/components/admin/AdminHeader';
 import EventPhotoManager from '@/components/admin/EventPhotoManager';
 import TokenQRCode from '@/components/admin/TokenQRCode';
+import { slugify } from '@/lib/utils';
 
 interface Event {
   id: string;
@@ -103,11 +104,12 @@ export default function EditEventPage() {
 
       // Update event via Supabase
       // IMPORTANT: slug must be updated together with name to keep URL working
+      // Generate URL-friendly slug from name (lowercase, no spaces, no special chars)
       const { data: updatedEvent, error: updateError } = await supabase
         .from('events')
         .update({
           name: data.name,
-          slug: data.name, // Keep slug in sync with name for public URL
+          slug: slugify(data.name), // Generate URL-friendly slug from name
           title: data.title,
           organizer: data.organizer,
           date: data.date,
@@ -126,11 +128,12 @@ export default function EditEventPage() {
 
       setEvent(updatedEvent);
       setSuccess(true);
+      router.push(`/admin/events/${eventId}/dashboard`);
 
       // Auto-hide success message after 3 seconds
-      setTimeout(() => {
-        setSuccess(false);
-      }, 3000);
+      // setTimeout(() => {
+      //   setSuccess(false);
+      // }, 3000);
     } catch (err: any) {
       console.error('Error updating event:', err);
       setError(err.message || 'Failed to update event');
