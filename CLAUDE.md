@@ -17,6 +17,8 @@ Auto-generated from all feature plans. Last updated: 2025-10-06
 - TypeScript 5.3+ (Node.js 20 LTS backend, React 18 frontend) + Next.js 14 App Router, Supabase (database + auth + storage), Tailwind CSS 3.x, Lucide React (010-ok-now-i)
 - Supabase PostgreSQL with RLS policies, Supabase Storage for banner files (alternative: Cloudflare R2 via existing integration) (010-ok-now-i)
 - TypeScript 5.3+ (Node.js 20 LTS runtime via Next.js) (011-il-momento-di)
+- TypeScript 5.3+ (Node.js 20 LTS backend, React 18 frontend) + Next.js 14 App Router, Express.js (deprecated), Supabase (PostgreSQL + Storage + Auth), Tailwind CSS 3.x, Lucide React, nanoid (tokens), Zod (validation) (012-dobbiamo-lavorare-al)
+- Supabase PostgreSQL with RLS, Supabase Storage for logos/banners (already implemented), Cloudflare R2 for hot/cold archiving (feature 008) (012-dobbiamo-lavorare-al)
 
 ## Project Structure
 ```
@@ -32,9 +34,9 @@ npm test; npm run lint
 TypeScript 5.3+ (Node.js 20 LTS for backend, React 18 for frontend): Follow standard conventions
 
 ## Recent Changes
+- 012-dobbiamo-lavorare-al: Added TypeScript 5.3+ (Node.js 20 LTS backend, React 18 frontend) + Next.js 14 App Router, Express.js (deprecated), Supabase (PostgreSQL + Storage + Auth), Tailwind CSS 3.x, Lucide React, nanoid (tokens), Zod (validation)
 - 011-il-momento-di: Added TypeScript 5.3+ (Node.js 20 LTS runtime via Next.js)
 - 010-ok-now-i: Added TypeScript 5.3+ (Node.js 20 LTS backend, React 18 frontend) + Next.js 14 App Router, Supabase (database + auth + storage), Tailwind CSS 3.x, Lucide React
-- 009-voglio-implementare-la: Added TypeScript 5.3+ (Node.js 20 LTS backend, React 18 frontend) + Next.js 14 App Router (frontend), CloudConvert API SDK, Supabase Client, Cloudflare R2 SDK, Email service (for failure notifications)
 
 <!-- MANUAL ADDITIONS START -->
 

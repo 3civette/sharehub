@@ -113,7 +113,8 @@
       "Bash(do echo \"=== $file ===\")",
       "Bash(head:*)",
       "Read(//c/Users/KreshOS/Pictures/Screenshots/**)",
-      "Bash(git pull:*)"
+      "Bash(git pull:*)",
+      "Bash(do echo \"=== Applying $file ===\")"
     ],
     "deny": [],
     "ask": []

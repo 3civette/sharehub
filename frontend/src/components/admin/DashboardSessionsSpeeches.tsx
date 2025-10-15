@@ -3,11 +3,29 @@
 // Dashboard Sessions & Speeches Manager
 // Unified component to manage sessions and speeches inline
 
-import { useState } from 'react';
+import { useState, useCallback, useMemo, memo } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
-import { Calendar, Clock, MapPin, Plus, Edit, Trash, Upload } from 'lucide-react';
+import { Calendar, Clock, MapPin, Plus, Edit, Trash, Upload, GripVertical } from 'lucide-react';
 import ThumbnailQuotaBadge from './ThumbnailQuotaBadge';
 import { useThumbnailProgress } from '@/hooks/useThumbnailProgress';
+import SpeechEditForm from './SpeechEditForm';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 interface Session {
   id: string;
@@ -29,6 +47,7 @@ interface Speech {
   speaker_name: string;
   description: string | null;
   duration_minutes: number | null;
+  display_order: number;
   created_at: string;
   updated_at: string;
   slide_count?: number; // Number of slides uploaded
@@ -118,11 +137,88 @@ export default function DashboardSessionsSpeeches({
     duration: '',
   });
 
+  const handleSpeechFormChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setSpeechFormData(prev => ({ ...prev, [name]: value }));
+  }, []);
+
+  // ==================== DRAG AND DROP ====================
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8, // Richiede 8px di movimento prima di iniziare il drag
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragEnd = async (event: DragEndEvent, sessionId: string) => {
+    const { active, over } = event;
+
+    if (!over || active.id === over.id) {
+      return;
+    }
+
+    // Get speeches for this session sorted by display_order
+    const sessionSpeeches = speeches
+      .filter((sp) => sp.session_id === sessionId)
+      .sort((a, b) => a.display_order - b.display_order);
+
+    const oldIndex = sessionSpeeches.findIndex((sp) => sp.id === active.id);
+    const newIndex = sessionSpeeches.findIndex((sp) => sp.id === over.id);
+
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    // Reorder locally
+    const reorderedSpeeches = arrayMove(sessionSpeeches, oldIndex, newIndex);
+
+    // Update local state with new order for all speeches
+    const updatedSpeeches = speeches.map((speech) => {
+      const reorderedIndex = reorderedSpeeches.findIndex((sp) => sp.id === speech.id);
+      if (reorderedIndex !== -1) {
+        return { ...speech, display_order: reorderedIndex };
+      }
+      return speech;
+    });
+
+    setSpeeches(updatedSpeeches);
+
+    // Update database
+    try {
+      const updates = reorderedSpeeches.map((speech, index) => ({
+        id: speech.id,
+        display_order: index,
+      }));
+
+      for (const update of updates) {
+        await supabase
+          .from('speeches')
+          .update({ display_order: update.display_order })
+          .eq('id', update.id);
+      }
+    } catch (error) {
+      console.error('Error updating speech order:', error);
+      alert('Errore nel riordino degli interventi');
+      // Revert on error
+      setSpeeches(speeches);
+    }
+  };
+
+  const handleSessionFormChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setSessionFormData(prev => ({ ...prev, [name]: value }));
+  }, []);
+
   // ==================== SESSION CRUD ====================
 
   const combineDateAndTime = (time: string): string => {
     if (!time) return '';
-    return `${eventDate}T${time}:00.000Z`;
+    // Simply combine date and time without timezone conversion
+    // Store as-is and let PostgreSQL handle it as timestamp without timezone
+    return `${eventDate}T${time}:00.000`;
   };
 
   const resetSessionForm = () => {
@@ -223,8 +319,11 @@ export default function DashboardSessionsSpeeches({
 
   const startEditSession = (session: Session) => {
     const extractTime = (isoDateTime: string) => {
-      const date = new Date(isoDateTime);
-      return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+      // Extract time directly from ISO string without Date conversion
+      // Format: "2025-10-29T09:00:00" → "09:00"
+      const timePart = isoDateTime.split('T')[1];
+      if (!timePart) return '';
+      return timePart.substring(0, 5); // Get HH:MM
     };
 
     setSessionFormData({
@@ -240,7 +339,7 @@ export default function DashboardSessionsSpeeches({
 
   // ==================== SPEECH CRUD ====================
 
-  const resetSpeechForm = () => {
+  const resetSpeechForm = useCallback(() => {
     setSpeechFormData({
       session_id: '',
       title: '',
@@ -250,7 +349,12 @@ export default function DashboardSessionsSpeeches({
     });
     setAddingSpeechToSession(null);
     setEditingSpeechId(null);
-  };
+  }, []);
+
+  const handleSpeechUpdate = useCallback((updatedSpeech: Speech) => {
+    setSpeeches(prev => prev.map((sp) => (sp.id === updatedSpeech.id ? updatedSpeech : sp)));
+    resetSpeechForm();
+  }, [resetSpeechForm]);
 
   const handleCreateSpeech = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -362,11 +466,11 @@ export default function DashboardSessionsSpeeches({
   // ==================== FORMATTERS ====================
 
   const formatDateTime = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleString('it-IT', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    // Extract time directly from ISO string without Date conversion to avoid timezone issues
+    // Format: "2025-10-29T09:00:00" → "09:00"
+    const timePart = dateString.split('T')[1];
+    if (!timePart) return '';
+    return timePart.substring(0, 5); // Get HH:MM
   };
 
   const formatEventDate = (dateString: string) => {
@@ -378,6 +482,119 @@ export default function DashboardSessionsSpeeches({
       year: 'numeric',
     });
   };
+
+  // ==================== SORTABLE SPEECH COMPONENT ====================
+
+  interface SortableSpeechProps {
+    speech: Speech;
+    isEditingThis: boolean;
+    eventId: string;
+  }
+
+  function SortableSpeech({ speech, isEditingThis, eventId }: SortableSpeechProps) {
+    const {
+      attributes,
+      listeners,
+      setNodeRef,
+      transform,
+      transition,
+      isDragging,
+    } = useSortable({ id: speech.id });
+
+    const style = {
+      transform: CSS.Transform.toString(transform),
+      transition,
+      opacity: isDragging ? 0.5 : 1,
+    };
+
+    // If editing, don't render the speech card - the form is rendered separately
+    if (isEditingThis) {
+      return null;
+    }
+
+    return (
+      <div
+        ref={setNodeRef}
+        style={style}
+        className="p-4 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border-l-4 border-purple-500 shadow-sm hover:shadow-md transition-all"
+      >
+        <div className="flex items-start justify-between">
+          <div className="flex items-center gap-2 flex-1">
+            <button
+              {...attributes}
+              {...listeners}
+              className="p-1 text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing"
+              style={{ touchAction: 'none' }}
+              title="Trascina per riordinare"
+            >
+              <GripVertical className="w-5 h-5" />
+            </button>
+            <div className="flex-1" onClick={() => window.location.href = `/admin/events/${eventId}/speeches/${speech.id}/slides`} style={{ cursor: 'pointer' }}>
+              <h4 className="font-semibold text-brandBlack text-base">{speech.title}</h4>
+              <div className="flex flex-wrap gap-3 mt-2">
+                {speech.speaker_name && (
+                  <span className="text-sm text-brandInk/70 flex items-center gap-1">
+                    👤 {speech.speaker_name}
+                  </span>
+                )}
+                {speech.duration_minutes && (
+                  <span className="text-sm text-brandInk/70 flex items-center gap-1">
+                    ⏱️ {speech.duration_minutes} min
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex gap-2 ml-4" onClick={(e) => e.stopPropagation()}>
+            <a
+              href={`/admin/events/${eventId}/speeches/${speech.id}/slides`}
+              className="px-3 py-2 text-purple-600 hover:text-purple-700 hover:bg-purple-50 rounded-lg transition flex items-center gap-1 text-sm font-medium"
+              title="Gestisci slide"
+            >
+              Slide {speech.slide_count !== undefined && speech.slide_count > 0 && '✓'}
+            </a>
+            <button
+              onClick={() => startEditSpeech(speech)}
+              className="p-2 text-green-600 hover:text-green-700 hover:bg-green-50 rounded-lg transition flex items-center justify-center"
+              title="Modifica Intervento"
+            >
+              <Edit className="w-5 h-5" />
+            </button>
+            <button
+              onClick={() => handleDeleteSpeech(speech.id)}
+              className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition flex items-center justify-center"
+              title="Elimina Intervento"
+            >
+              <Trash className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const MemoizedSortableSpeech = memo(SortableSpeech);
+
+  // ==================== MEMOIZED DATA ====================
+
+  // Memoize speeches grouped by session to prevent unnecessary recalculations
+  const speechesBySession = useMemo(() => {
+    const map = new Map<string, Speech[]>();
+    sessions.forEach(session => {
+      const sessionSpeeches = speeches
+        .filter((sp) => sp.session_id === session.id)
+        .sort((a, b) => a.display_order - b.display_order);
+      map.set(session.id, sessionSpeeches);
+    });
+    return map;
+  }, [speeches, sessions]);
+
+  // Memoize the speech being edited to maintain object reference stability
+  const editingSpeech = useMemo(() => {
+    if (!editingSpeechId) return null;
+    return speeches.find(sp => sp.id === editingSpeechId) || null;
+  }, [editingSpeechId, speeches]);
 
   // ==================== RENDER ====================
 
@@ -394,7 +611,7 @@ export default function DashboardSessionsSpeeches({
             className="px-4 py-2 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary/90 transition flex items-center gap-2"
           >
             <Plus className="w-4 h-4" />
-            <span>Nuova Sessione</span>
+            <span>Sessione</span>
           </button>
         )}
       </div>
@@ -409,7 +626,7 @@ export default function DashboardSessionsSpeeches({
 
       {/* Session Create/Edit Form */}
       {(isCreatingSession || editingSessionId) && (
-        <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-6 mb-6 border border-gray-200 dark:border-gray-700">
+        <div key={editingSessionId || 'new-session'} className="bg-gray-50 dark:bg-gray-800 rounded-lg p-6 mb-6 border border-gray-200 dark:border-gray-700">
           <h3 className="text-lg font-bold text-brandBlack mb-4">
             {editingSessionId ? 'Modifica Sessione' : 'Nuova Sessione'}
           </h3>
@@ -421,8 +638,9 @@ export default function DashboardSessionsSpeeches({
               </label>
               <input
                 type="text"
+                name="title"
                 value={sessionFormData.title}
-                onChange={(e) => setSessionFormData({ ...sessionFormData, title: e.target.value })}
+                onChange={handleSessionFormChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg !text-gray-900 placeholder:!text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary"
                 required
                 maxLength={100}
@@ -437,8 +655,9 @@ export default function DashboardSessionsSpeeches({
                 </label>
                 <input
                   type="time"
+                  name="start_time"
                   value={sessionFormData.start_time}
-                  onChange={(e) => setSessionFormData({ ...sessionFormData, start_time: e.target.value })}
+                  onChange={handleSessionFormChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg !text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary"
                   required
                 />
@@ -450,8 +669,9 @@ export default function DashboardSessionsSpeeches({
                 </label>
                 <input
                   type="time"
+                  name="end_time"
                   value={sessionFormData.end_time}
-                  onChange={(e) => setSessionFormData({ ...sessionFormData, end_time: e.target.value })}
+                  onChange={handleSessionFormChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg !text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
@@ -463,8 +683,9 @@ export default function DashboardSessionsSpeeches({
               </label>
               <input
                 type="text"
+                name="room"
                 value={sessionFormData.room}
-                onChange={(e) => setSessionFormData({ ...sessionFormData, room: e.target.value })}
+                onChange={handleSessionFormChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg !text-gray-900 placeholder:!text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary"
                 maxLength={100}
                 placeholder="es. Sala Conferenze A"
@@ -490,13 +711,23 @@ export default function DashboardSessionsSpeeches({
         </div>
       )}
 
+      {/* Speech Edit Form - OUTSIDE sessions loop */}
+      {editingSpeechId && (
+        <SpeechEditForm
+          key={editingSpeechId}
+          speechId={editingSpeechId}
+          onCancel={resetSpeechForm}
+          onUpdate={handleSpeechUpdate}
+        />
+      )}
+
       {/* Sessions List */}
       {sessions.length === 0 ? (
         <p className="text-brandInk/70 text-center py-8">Nessuna sessione programmata. Clicca su "Nuova Sessione" per iniziare.</p>
       ) : (
         <div className="space-y-4">
           {sessions.map((session) => {
-            const sessionSpeeches = speeches.filter((sp) => sp.session_id === session.id);
+            const sessionSpeeches = speechesBySession.get(session.id) || [];
             const isAddingToThis = addingSpeechToSession === session.id;
 
             return (
@@ -548,7 +779,7 @@ export default function DashboardSessionsSpeeches({
                       className="mt-4 px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition flex items-center gap-2"
                     >
                       <Plus className="w-4 h-4" />
-                      Aggiungi Intervento
+                      Intervento
                     </button>
                   )}
                 </div>
@@ -626,152 +857,31 @@ export default function DashboardSessionsSpeeches({
 
                 {/* Speeches List */}
                 {sessionSpeeches.length > 0 ? (
-                  <div className="divide-y divide-gray-200 dark:divide-gray-700">
-                    {sessionSpeeches.map((speech) => {
-                      const isEditingThis = editingSpeechId === speech.id;
-
-                      return (
-                        <div key={speech.id}>
-                          {isEditingThis ? (
-                            /* Speech Edit Form */
-                            <div className="bg-yellow-50 dark:bg-yellow-900/20 p-4">
-                              <h4 className="text-md font-bold text-yellow-900 dark:text-yellow-100 mb-4">
-                                Modifica Intervento
-                              </h4>
-
-                              <form onSubmit={handleUpdateSpeech} className="space-y-4">
-                                <div>
-                                  <label className="block text-sm font-medium text-yellow-900 dark:text-yellow-100 mb-1">
-                                    Titolo <span className="text-red-500">*</span>
-                                  </label>
-                                  <input
-                                    type="text"
-                                    value={speechFormData.title}
-                                    onChange={(e) => setSpeechFormData({ ...speechFormData, title: e.target.value })}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg !text-gray-900 placeholder:!text-gray-500 focus:outline-none focus:ring-2 focus:ring-yellow-500"
-                                    required
-                                    maxLength={150}
-                                  />
-                                </div>
-
-                                <div>
-                                  <label className="block text-sm font-medium text-yellow-900 dark:text-yellow-100 mb-1">
-                                    Relatore
-                                  </label>
-                                  <input
-                                    type="text"
-                                    value={speechFormData.speaker_name}
-                                    onChange={(e) => setSpeechFormData({ ...speechFormData, speaker_name: e.target.value })}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg !text-gray-900 placeholder:!text-gray-500 focus:outline-none focus:ring-2 focus:ring-yellow-500"
-                                    maxLength={100}
-                                  />
-                                </div>
-
-                                <div>
-                                  <label className="block text-sm font-medium text-yellow-900 dark:text-yellow-100 mb-1">
-                                    Durata (minuti)
-                                  </label>
-                                  <input
-                                    type="number"
-                                    value={speechFormData.duration}
-                                    onChange={(e) => setSpeechFormData({ ...speechFormData, duration: e.target.value })}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg !text-gray-900 placeholder:!text-gray-500 focus:outline-none focus:ring-2 focus:ring-yellow-500"
-                                    min="1"
-                                    max="600"
-                                  />
-                                </div>
-
-                                <div className="flex gap-3">
-                                  <button
-                                    type="submit"
-                                    className="px-4 py-2 bg-yellow-600 text-white font-medium rounded-lg hover:bg-yellow-700 transition"
-                                  >
-                                    Salva Modifiche
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={resetSpeechForm}
-                                    className="px-4 py-2 bg-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-300 transition"
-                                  >
-                                    Annulla
-                                  </button>
-                                </div>
-                              </form>
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={(event) => handleDragEnd(event, session.id)}
+                  >
+                    <SortableContext
+                      items={sessionSpeeches.map(sp => sp.id)}
+                      strategy={verticalListSortingStrategy}
+                    >
+                      <div className="divide-y divide-gray-200 dark:divide-gray-700">
+                        {sessionSpeeches.map((speech) => {
+                          const isEditingThis = editingSpeechId === speech.id;
+                          return (
+                            <div key={speech.id}>
+                              <MemoizedSortableSpeech
+                                speech={speech}
+                                isEditingThis={isEditingThis}
+                                eventId={eventId}
+                              />
                             </div>
-                          ) : (
-                            /* Speech Display */
-                            <div
-                              onClick={() => window.location.href = `/admin/events/${eventId}/speeches/${speech.id}/slides`}
-                              className="p-4 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border-l-4 border-purple-500 shadow-sm hover:shadow-md transition-all cursor-pointer"
-                            >
-                              <div className="flex items-start justify-between">
-                                <div className="flex-1">
-                                  <div className="flex items-center gap-2">
-                                    <h4 className="font-semibold text-brandBlack text-base">{speech.title}</h4>
-                                    {speech.slide_count !== undefined && speech.slide_count > 0 && (
-                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-100 text-purple-700 text-xs font-medium rounded-full">
-                                        📄 {speech.slide_count} slide{speech.slide_count > 1 ? 's' : ''}
-                                      </span>
-                                    )}
-                                    {speech.thumbnail_status === 'processing' && (
-                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded-full animate-pulse">
-                                        🔄 Generating thumbnail...
-                                      </span>
-                                    )}
-                                    {speech.thumbnail_status === 'pending' && speech.slide_count !== undefined && speech.slide_count > 0 && (
-                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-yellow-100 text-yellow-700 text-xs font-medium rounded-full">
-                                        ⏳ Thumbnail pending
-                                      </span>
-                                    )}
-                                    {speech.thumbnail_status === 'completed' && speech.first_slide_thumbnail && (
-                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-700 text-xs font-medium rounded-full">
-                                        ✅ Thumbnail ready
-                                      </span>
-                                    )}
-                                    {speech.thumbnail_status === 'failed' && (
-                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-700 text-xs font-medium rounded-full">
-                                        ❌ Thumbnail generation failed
-                                      </span>
-                                    )}
-                                    {/* Note: 'none' status (unsupported file types) shows no badge */}
-                                  </div>
-                                  <div className="flex flex-wrap gap-3 mt-2">
-                                    {speech.speaker_name && (
-                                      <span className="text-sm text-brandInk/70 flex items-center gap-1">
-                                        👤 {speech.speaker_name}
-                                      </span>
-                                    )}
-                                    {speech.duration_minutes && (
-                                      <span className="text-sm text-brandInk/70 flex items-center gap-1">
-                                        ⏱️ {speech.duration_minutes} min
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-
-                                <div className="flex gap-2 ml-4" onClick={(e) => e.stopPropagation()}>
-                                  <button
-                                    onClick={() => startEditSpeech(speech)}
-                                    className="p-2 text-green-600 hover:text-green-700 hover:bg-green-50 rounded-lg transition flex items-center justify-center"
-                                    title="Modifica Intervento"
-                                  >
-                                    <Edit className="w-5 h-5" />
-                                  </button>
-                                  <button
-                                    onClick={() => handleDeleteSpeech(speech.id)}
-                                    className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition flex items-center justify-center"
-                                    title="Elimina Intervento"
-                                  >
-                                    <Trash className="w-5 h-5" />
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
+                          );
+                        })}
+                      </div>
+                    </SortableContext>
+                  </DndContext>
                 ) : (
                   !isAddingToThis && (
                     <div className="p-4 text-sm text-brandInk/70 italic text-center">

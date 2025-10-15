@@ -1,0 +1,497 @@
+openapi: 3.0.3
+info:
+  title: Meeting Hub - Subscription Management API
+  version: 1.0.0
+  description: |
+    REST API for managing subscription tiers, usage tracking, and tier upgrades/downgrades.
+    Enforces event limits per tier: FREE (3), Basic (5), Professional (20), Enterprise (unlimited).
+  contact:
+    name: 3Civette Development Team
+    email: dev@3civette.com
+
+servers:
+  - url: https://meeting-hub.netlify.app/api
+    description: Production
+  - url: http://localhost:3000/api
+    description: Local Development
+
+tags:
+  - name: Subscriptions
+    description: Subscription tier management and usage tracking
+
+paths:
+  /subscriptions/current:
+    get:
+      operationId: getCurrentSubscription
+      tags:
+        - Subscriptions
+      summary: Get current subscription details
+      description: |
+        Returns the authenticated agency's subscription tier, usage, and limits.
+        Includes percentage usage for progress bar display.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Subscription details retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriptionDetails'
+              examples:
+                free_tier_no_events:
+                  summary: FREE tier with no events
+                  value:
+                    id: "660e8400-e29b-41d4-a716-446655440000"
+                    tier: "free"
+                    status: "active"
+                    event_limit: 3
+                    current_event_count: 0
+                    usage_percent: 0
+                    events_remaining: 3
+                    price_monthly: 0.00
+                    billing_cycle: null
+                    can_create_event: true
+                    upgrade_available: true
+                    created_at: "2025-10-14T10:30:00Z"
+                    updated_at: "2025-10-14T10:30:00Z"
+                free_tier_at_limit:
+                  summary: FREE tier at limit (3/3 events)
+                  value:
+                    id: "660e8400-e29b-41d4-a716-446655440000"
+                    tier: "free"
+                    status: "active"
+                    event_limit: 3
+                    current_event_count: 3
+                    usage_percent: 100
+                    events_remaining: 0
+                    price_monthly: 0.00
+                    billing_cycle: null
+                    can_create_event: false
+                    upgrade_available: true
+                    created_at: "2025-10-14T10:30:00Z"
+                    updated_at: "2025-10-14T15:45:00Z"
+                professional_tier:
+                  summary: Professional tier with usage
+                  value:
+                    id: "770e8400-e29b-41d4-a716-446655440001"
+                    tier: "professional"
+                    status: "active"
+                    event_limit: 20
+                    current_event_count: 12
+                    usage_percent: 60
+                    events_remaining: 8
+                    price_monthly: 79.00
+                    billing_cycle: "2025-11-14"
+                    can_create_event: true
+                    upgrade_available: true
+                    created_at: "2025-09-14T08:00:00Z"
+                    updated_at: "2025-10-14T14:20:00Z"
+                enterprise_tier:
+                  summary: Enterprise tier (unlimited events)
+                  value:
+                    id: "880e8400-e29b-41d4-a716-446655440002"
+                    tier: "enterprise"
+                    status: "active"
+                    event_limit: -1
+                    current_event_count: 47
+                    usage_percent: 0
+                    events_remaining: -1
+                    price_monthly: 199.00
+                    billing_cycle: "2025-11-01"
+                    can_create_event: true
+                    upgrade_available: false
+                    created_at: "2025-01-15T12:00:00Z"
+                    updated_at: "2025-10-14T09:15:00Z"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /subscriptions/upgrade:
+    post:
+      operationId: upgradeSubscription
+      tags:
+        - Subscriptions
+      summary: Upgrade to a higher tier
+      description: |
+        Upgrades the agency subscription to a higher tier.
+        Takes effect immediately. No prorated billing in MVP.
+        Cannot upgrade if already at target tier or higher.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpgradeRequest'
+            examples:
+              free_to_basic:
+                summary: Upgrade from FREE to Basic
+                value:
+                  target_tier: "basic"
+              basic_to_professional:
+                summary: Upgrade from Basic to Professional
+                value:
+                  target_tier: "professional"
+              professional_to_enterprise:
+                summary: Upgrade from Professional to Enterprise
+                value:
+                  target_tier: "enterprise"
+      responses:
+        '200':
+          description: Subscription upgraded successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriptionUpdateResponse'
+              examples:
+                success:
+                  value:
+                    message: "Subscription upgraded successfully"
+                    previous_tier: "free"
+                    new_tier: "basic"
+                    new_event_limit: 5
+                    price_monthly: 29.00
+                    billing_cycle: "2025-11-14"
+                    effective_date: "2025-10-14T16:45:00Z"
+        '400':
+          description: Invalid upgrade request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalid_tier:
+                  value:
+                    error: "INVALID_TIER"
+                    message: "Invalid target tier. Must be one of: basic, professional, enterprise"
+                    details:
+                      target_tier: "premium"
+                      allowed_tiers: ["basic", "professional", "enterprise"]
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: Conflict - Already at or above target tier
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                already_at_tier:
+                  value:
+                    error: "ALREADY_AT_TIER"
+                    message: "Already subscribed to basic tier"
+                    details:
+                      current_tier: "basic"
+                      target_tier: "basic"
+                already_above_tier:
+                  value:
+                    error: "INVALID_UPGRADE"
+                    message: "Cannot upgrade to basic (currently on professional)"
+                    details:
+                      current_tier: "professional"
+                      target_tier: "basic"
+                      suggestion: "Use downgrade endpoint to switch to a lower tier"
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /subscriptions/downgrade:
+    post:
+      operationId: downgradeSubscription
+      tags:
+        - Subscriptions
+      summary: Downgrade to a lower tier
+      description: |
+        Downgrades the agency subscription to a lower tier.
+        Only allowed if current_event_count <= new tier's event_limit.
+        Takes effect immediately. No refunds in MVP.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DowngradeRequest'
+            examples:
+              professional_to_basic:
+                summary: Downgrade from Professional to Basic
+                value:
+                  target_tier: "basic"
+              basic_to_free:
+                summary: Downgrade from Basic to FREE
+                value:
+                  target_tier: "free"
+      responses:
+        '200':
+          description: Subscription downgraded successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriptionUpdateResponse'
+              examples:
+                success:
+                  value:
+                    message: "Subscription downgraded successfully"
+                    previous_tier: "professional"
+                    new_tier: "basic"
+                    new_event_limit: 5
+                    price_monthly: 29.00
+                    billing_cycle: "2025-11-14"
+                    effective_date: "2025-10-14T17:00:00Z"
+        '400':
+          description: Invalid downgrade request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalid_tier:
+                  value:
+                    error: "INVALID_TIER"
+                    message: "Invalid target tier. Must be one of: free, basic, professional"
+                    details:
+                      target_tier: "starter"
+                      allowed_tiers: ["free", "basic", "professional"]
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: Conflict - Too many events for target tier
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                too_many_events:
+                  value:
+                    error: "TOO_MANY_EVENTS"
+                    message: "Cannot downgrade to basic (5 events max) - you have 12 active events"
+                    details:
+                      current_tier: "professional"
+                      target_tier: "basic"
+                      current_event_count: 12
+                      target_event_limit: 5
+                      events_to_delete: 7
+                      suggestion: "Delete at least 7 events before downgrading"
+                already_at_tier:
+                  value:
+                    error: "ALREADY_AT_TIER"
+                    message: "Already subscribed to free tier"
+                    details:
+                      current_tier: "free"
+                      target_tier: "free"
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtained from Supabase Auth
+
+  schemas:
+    SubscriptionDetails:
+      type: object
+      required:
+        - id
+        - tier
+        - status
+        - event_limit
+        - current_event_count
+        - usage_percent
+        - events_remaining
+        - price_monthly
+        - can_create_event
+        - upgrade_available
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Subscription ID
+          example: "660e8400-e29b-41d4-a716-446655440000"
+        tier:
+          type: string
+          enum: [free, basic, professional, enterprise]
+          description: Current subscription tier
+          example: "free"
+        status:
+          type: string
+          enum: [active, suspended, cancelled]
+          description: Subscription status
+          example: "active"
+        event_limit:
+          type: integer
+          description: Maximum events allowed (-1 = unlimited for Enterprise)
+          example: 3
+        current_event_count:
+          type: integer
+          description: Current number of active events
+          example: 2
+        usage_percent:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: Usage percentage (0 for Enterprise unlimited)
+          example: 67
+        events_remaining:
+          type: integer
+          description: Events remaining before hitting limit (-1 for Enterprise)
+          example: 1
+        price_monthly:
+          type: number
+          format: decimal
+          minimum: 0
+          description: Monthly price in EUR
+          example: 0.00
+        billing_cycle:
+          type: string
+          format: date
+          nullable: true
+          description: Next billing date (null for FREE tier)
+          example: "2025-11-14"
+        can_create_event:
+          type: boolean
+          description: Whether agency can create another event
+          example: true
+        upgrade_available:
+          type: boolean
+          description: Whether upgrade to higher tier is available
+          example: true
+        created_at:
+          type: string
+          format: date-time
+          description: Subscription start date
+          example: "2025-10-14T10:30:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          description: Last tier change timestamp
+          example: "2025-10-14T15:45:00Z"
+
+    UpgradeRequest:
+      type: object
+      required:
+        - target_tier
+      properties:
+        target_tier:
+          type: string
+          enum: [basic, professional, enterprise]
+          description: Tier to upgrade to (cannot be 'free')
+          example: "basic"
+
+    DowngradeRequest:
+      type: object
+      required:
+        - target_tier
+      properties:
+        target_tier:
+          type: string
+          enum: [free, basic, professional]
+          description: Tier to downgrade to (cannot be 'enterprise')
+          example: "basic"
+
+    SubscriptionUpdateResponse:
+      type: object
+      required:
+        - message
+        - previous_tier
+        - new_tier
+        - new_event_limit
+        - price_monthly
+        - effective_date
+      properties:
+        message:
+          type: string
+          description: Human-readable success message
+          example: "Subscription upgraded successfully"
+        previous_tier:
+          type: string
+          enum: [free, basic, professional, enterprise]
+          description: Previous subscription tier
+          example: "free"
+        new_tier:
+          type: string
+          enum: [free, basic, professional, enterprise]
+          description: New subscription tier
+          example: "basic"
+        new_event_limit:
+          type: integer
+          description: New maximum events allowed
+          example: 5
+        price_monthly:
+          type: number
+          format: decimal
+          minimum: 0
+          description: New monthly price in EUR
+          example: 29.00
+        billing_cycle:
+          type: string
+          format: date
+          nullable: true
+          description: Next billing date (null for FREE tier)
+          example: "2025-11-14"
+        effective_date:
+          type: string
+          format: date-time
+          description: Timestamp when tier change took effect
+          example: "2025-10-14T16:45:00Z"
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+          description: Machine-readable error code
+          example: "TOO_MANY_EVENTS"
+        message:
+          type: string
+          description: Human-readable error message
+          example: "Cannot downgrade to basic (5 events max) - you have 12 active events"
+        details:
+          type: object
+          description: Additional error context
+          additionalProperties: true
+          example:
+            current_event_count: 12
+            target_event_limit: 5
+            events_to_delete: 7
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid authentication token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            missing_token:
+              value:
+                error: "UNAUTHORIZED"
+                message: "Authentication token required"
+            invalid_token:
+              value:
+                error: "UNAUTHORIZED"
+                message: "Invalid or expired authentication token"
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            generic_error:
+              value:
+                error: "INTERNAL_ERROR"
+                message: "An unexpected error occurred"
+                details:
+                  request_id: "req_xyz789"
