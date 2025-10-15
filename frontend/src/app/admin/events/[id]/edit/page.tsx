@@ -7,7 +7,6 @@ import EventForm from '@/components/admin/EventForm';
 import AdminHeader from '@/components/admin/AdminHeader';
 import EventPhotoManager from '@/components/admin/EventPhotoManager';
 import TokenQRCode from '@/components/admin/TokenQRCode';
-import { slugify } from '@/lib/utils';
 
 interface Event {
   id: string;
@@ -103,13 +102,13 @@ export default function EditEventPage() {
       }
 
       // Update event via Supabase
-      // IMPORTANT: slug must be updated together with name to keep URL working
-      // Generate URL-friendly slug from name (lowercase, no spaces, no special chars)
+      // IMPORTANT: slug is NOT updated when editing - it's set only at creation
+      // This ensures public URLs remain stable even if event name changes
       const { data: updatedEvent, error: updateError } = await supabase
         .from('events')
         .update({
           name: data.name,
-          slug: slugify(data.name), // Generate URL-friendly slug from name
+          // slug is intentionally NOT updated - keeps public URL stable
           title: data.title,
           organizer: data.organizer,
           date: data.date,
