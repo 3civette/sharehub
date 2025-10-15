@@ -18,6 +18,6 @@ import { SupabaseClient } from '@supabase/supabase-js';
  * const { data, error } = await supabase.from('table').select('*');
  * ```
  */
-export async function createClient(): Promise<SupabaseClient> {
+export async function createClient() {
   return createRouteHandlerClient({ cookies });
 }

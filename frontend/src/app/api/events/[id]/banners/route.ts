@@ -28,7 +28,7 @@ export async function POST(
     // -------------------------------------------------------------------------
     // Step 1: Authenticate user
     // -------------------------------------------------------------------------
-    const supabase = createRouteHandlerClient<Database>({ cookies });
+    const supabase = createRouteHandlerClient({ cookies });
     const {
       data: { session },
       error: authError,
@@ -281,7 +281,7 @@ export async function GET(
     // -------------------------------------------------------------------------
     // Step 1: Authenticate user
     // -------------------------------------------------------------------------
-    const supabase = createRouteHandlerClient<Database>({ cookies });
+    const supabase = createRouteHandlerClient({ cookies });
     const {
       data: { session },
       error: authError,

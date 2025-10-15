@@ -8,9 +8,11 @@ interface Session {
   id: string;
   event_id: string;
   title: string;
+  description: string | null;
   start_time: string;
   end_time: string;
   room: string | null;
+  display_order: number;
   created_at: string;
   updated_at: string;
 }
@@ -28,6 +30,7 @@ interface Speech {
   speaker_name: string;
   description: string | null;
   duration_minutes: number | null;
+  display_order: number;
   slide_count: number;
   first_slide_thumbnail: string | null;
   thumbnail_status: 'pending' | 'processing' | 'completed' | 'failed' | 'none';
@@ -110,7 +113,7 @@ export async function fetchDashboardData(
     .from('sessions')
     .select('*')
     .eq('event_id', eventId)
-    .order('start_time', { ascending: true });
+    .order('display_order', { ascending: true });
 
   // Fetch speeches with session info and slide count + thumbnail data
   const { data: speeches } = await supabase
@@ -122,7 +125,7 @@ export async function fetchDashboardData(
     `)
     .eq('session.event_id', eventId)
     .is('slides.deleted_at', null)
-    .order('created_at', { ascending: true });
+    .order('display_order', { ascending: true });
 
   // Calculate slide count and thumbnail data for each speech
   const speechesWithSlideCount = speeches?.map(speech => {

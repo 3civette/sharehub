@@ -120,22 +120,9 @@ export async function createThumbnailJob(
           inline: false,
           archive_multiple_files: false,
         },
-
-        // Task 4: Send webhook notification when complete
-        'webhook-notify': {
-          operation: 'webhook',
-          url: config.webhookUrl,
-          input: ['export-thumbnail'],
-          // Pass metadata for webhook processing
-          payload: JSON.stringify({
-            slide_id: config.slideId,
-            tenant_id: config.tenantId,
-            output_filename: config.outputFilename,
-          }),
-        },
       },
 
-      // Job-level webhook for error notifications
+      // Job-level webhook for completion/error notifications
       webhook_url: config.webhookUrl,
 
       // Tag for tracking
@@ -230,7 +217,9 @@ export async function cancelJob(
   jobId: string
 ): Promise<void> {
   try {
-    await client.jobs.cancel(jobId);
+    // CloudConvert SDK doesn't expose a cancel method in TypeScript types
+    // Use delete or wait for job to complete naturally
+    await client.jobs.delete(jobId);
   } catch (error) {
     // Log but don't throw - cancellation is best-effort
     console.error(`Failed to cancel CloudConvert job ${jobId}:`, error);

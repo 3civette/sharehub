@@ -44,7 +44,7 @@ export interface PublicEventResponse {
   }[];
   metrics: {
     page_views: number;
-    total_slide_downloads: number;
+    total_downloads: number;
   };
 }
 

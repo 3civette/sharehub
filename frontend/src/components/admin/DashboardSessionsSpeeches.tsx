@@ -27,7 +27,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
-interface Session {
+interface EventSession {
   id: string;
   event_id: string;
   title: string;
@@ -40,7 +40,7 @@ interface Session {
   updated_at: string;
 }
 
-interface Speech {
+interface EventSpeech {
   id: string;
   session_id: string;
   title: string;
@@ -59,8 +59,8 @@ interface DashboardSessionsSpeechesProps {
   eventId: string;
   tenantId: string;
   eventDate: string;
-  sessions: Session[];
-  speeches: Speech[];
+  sessions: EventSession[];
+  speeches: EventSpeech[];
   accessToken: string;
 }
 
@@ -74,8 +74,8 @@ export default function DashboardSessionsSpeeches({
 }: DashboardSessionsSpeechesProps) {
   const supabase = createClientComponentClient();
 
-  const [sessions, setSessions] = useState<Session[]>(initialSessions || []);
-  const [speeches, setSpeeches] = useState<Speech[]>(initialSpeeches || []);
+  const [sessions, setSessions] = useState<EventSession[]>(initialSessions || []);
+  const [speeches, setSpeeches] = useState<EventSpeech[]>(initialSpeeches || []);
 
   // ==================== REALTIME THUMBNAIL UPDATES ====================
 
@@ -126,7 +126,7 @@ export default function DashboardSessionsSpeeches({
     room: '',
   });
 
-  // Speech form state
+  // EventSpeech form state
   const [addingSpeechToSession, setAddingSpeechToSession] = useState<string | null>(null);
   const [editingSpeechId, setEditingSpeechId] = useState<string | null>(null);
   const [speechFormData, setSpeechFormData] = useState({
@@ -317,7 +317,7 @@ export default function DashboardSessionsSpeeches({
     }
   };
 
-  const startEditSession = (session: Session) => {
+  const startEditSession = (session: EventSession) => {
     const extractTime = (isoDateTime: string) => {
       // Extract time directly from ISO string without Date conversion
       // Format: "2025-10-29T09:00:00" → "09:00"
@@ -351,7 +351,7 @@ export default function DashboardSessionsSpeeches({
     setEditingSpeechId(null);
   }, []);
 
-  const handleSpeechUpdate = useCallback((updatedSpeech: Speech) => {
+  const handleSpeechUpdate = useCallback((updatedSpeech: EventSpeech) => {
     setSpeeches(prev => prev.map((sp) => (sp.id === updatedSpeech.id ? updatedSpeech : sp)));
     resetSpeechForm();
   }, [resetSpeechForm]);
@@ -439,7 +439,7 @@ export default function DashboardSessionsSpeeches({
     }
   };
 
-  const startEditSpeech = (speech: Speech) => {
+  const startEditSpeech = (speech: EventSpeech) => {
     setSpeechFormData({
       session_id: speech.session_id,
       title: speech.title,
@@ -486,7 +486,7 @@ export default function DashboardSessionsSpeeches({
   // ==================== SORTABLE SPEECH COMPONENT ====================
 
   interface SortableSpeechProps {
-    speech: Speech;
+    speech: EventSpeech;
     isEditingThis: boolean;
     eventId: string;
   }
@@ -580,7 +580,7 @@ export default function DashboardSessionsSpeeches({
 
   // Memoize speeches grouped by session to prevent unnecessary recalculations
   const speechesBySession = useMemo(() => {
-    const map = new Map<string, Speech[]>();
+    const map = new Map<string, EventSpeech[]>();
     sessions.forEach(session => {
       const sessionSpeeches = speeches
         .filter((sp) => sp.session_id === session.id)
@@ -711,7 +711,7 @@ export default function DashboardSessionsSpeeches({
         </div>
       )}
 
-      {/* Speech Edit Form - OUTSIDE sessions loop */}
+      {/* EventSpeech Edit Form - OUTSIDE sessions loop */}
       {editingSpeechId && (
         <SpeechEditForm
           key={editingSpeechId}
@@ -772,7 +772,7 @@ export default function DashboardSessionsSpeeches({
                     </div>
                   </div>
 
-                  {/* Add Speech Button */}
+                  {/* Add EventSpeech Button */}
                   {!isAddingToThis && !editingSpeechId && (
                     <button
                       onClick={() => startAddSpeechToSession(session.id)}
@@ -784,7 +784,7 @@ export default function DashboardSessionsSpeeches({
                   )}
                 </div>
 
-                {/* Speech Create Form (inside session) */}
+                {/* EventSpeech Create Form (inside session) */}
                 {isAddingToThis && (
                   <div className="bg-green-50 dark:bg-green-900/20 p-4 border-t border-green-200 dark:border-green-800">
                     <h4 className="text-md font-bold text-green-900 dark:text-green-100 mb-4">

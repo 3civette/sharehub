@@ -73,11 +73,21 @@ export async function GET(
       }
 
       // Update token usage tracking
+      // First, get current use_count
+      const { data: tokenData } = await supabase
+        .from('access_tokens')
+        .select('use_count')
+        .eq('id', tokenValidation[0].token_id)
+        .single();
+
+      const currentCount = tokenData?.use_count || 0;
+
+      // Then update with incremented value
       await supabase
         .from('access_tokens')
         .update({
           last_used_at: new Date().toISOString(),
-          use_count: supabase.sql`use_count + 1`
+          use_count: currentCount + 1
         })
         .eq('id', tokenValidation[0].token_id);
     }

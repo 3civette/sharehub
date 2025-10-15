@@ -11,7 +11,22 @@ import ThumbnailFailureEmail, {
 } from '@/emails/thumbnail-failure-notification';
 import { createClient } from '@/lib/supabase/server';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+/**
+ * Lazy initialization for Resend client
+ * Prevents build-time errors when RESEND_API_KEY is not available
+ */
+let resendInstance: Resend | null = null;
+
+function getResendClient(): Resend {
+  if (!resendInstance) {
+    const apiKey = process.env.RESEND_API_KEY;
+    if (!apiKey) {
+      throw new Error('RESEND_API_KEY environment variable is required for email notifications');
+    }
+    resendInstance = new Resend(apiKey);
+  }
+  return resendInstance;
+}
 
 export interface FailureNotificationContext {
   tenantId: string;
@@ -128,6 +143,7 @@ export async function sendThumbnailFailureNotification(
     const emailHtml = render(ThumbnailFailureEmail(emailProps));
 
     // Step 7: Send email via Resend
+    const resend = getResendClient();
     const { data, error } = await resend.emails.send({
       from: `shareHub <${fromEmail}>`,
       to: adminEmails,
@@ -249,6 +265,7 @@ export async function sendTestNotification(
 
     const emailHtml = render(ThumbnailFailureEmail(emailProps));
 
+    const resend = getResendClient();
     const { data, error } = await resend.emails.send({
       from: `shareHub <${fromEmail}>`,
       to: recipientEmail,

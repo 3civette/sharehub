@@ -39,7 +39,7 @@ export async function GET(
     // -------------------------------------------------------------------------
     // Step 1: Create Supabase client (no auth required for public access)
     // -------------------------------------------------------------------------
-    const supabase = createRouteHandlerClient<Database>({ cookies });
+    const supabase = createRouteHandlerClient({ cookies });
 
     // -------------------------------------------------------------------------
     // Step 2: Fetch event by slug and verify it's public

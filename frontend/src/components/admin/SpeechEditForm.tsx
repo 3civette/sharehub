@@ -10,6 +10,9 @@ interface Speech {
   speaker_name: string;
   description: string | null;
   duration_minutes: number | null;
+  display_order: number;
+  created_at: string;
+  updated_at: string;
 }
 
 interface SpeechEditFormProps {

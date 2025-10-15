@@ -56,7 +56,7 @@ export async function PATCH(
     // -------------------------------------------------------------------------
     // Step 1: Authenticate user
     // -------------------------------------------------------------------------
-    const supabase = createRouteHandlerClient<Database>({ cookies });
+    const supabase = createRouteHandlerClient({ cookies });
     const {
       data: { session },
       error: authError,
@@ -100,7 +100,7 @@ export async function PATCH(
       body = updateBannerSchema.parse(rawBody);
     } catch (error: any) {
       if (error instanceof z.ZodError) {
-        const firstError = error.errors[0];
+        const firstError = error.issues[0];
         return NextResponse.json(
           {
             error: 'INVALID_URL_FORMAT',
@@ -153,12 +153,19 @@ export async function PATCH(
     // -------------------------------------------------------------------------
     // Step 4: Update banner in database
     // -------------------------------------------------------------------------
+    const updateData: Database['public']['Tables']['banners']['Update'] = {
+      updated_at: new Date().toISOString(),
+    };
+    if (body.is_active !== undefined) {
+      updateData.is_active = body.is_active;
+    }
+    if (body.click_url !== undefined) {
+      updateData.click_url = body.click_url;
+    }
+
     const { data: updatedBanner, error: updateError } = await supabase
       .from('banners')
-      .update({
-        ...body,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updateData)
       .eq('id', bannerId)
       .select('*')
       .single();
@@ -204,7 +211,7 @@ export async function DELETE(
     // -------------------------------------------------------------------------
     // Step 1: Authenticate user
     // -------------------------------------------------------------------------
-    const supabase = createRouteHandlerClient<Database>({ cookies });
+    const supabase = createRouteHandlerClient({ cookies });
     const {
       data: { session },
       error: authError,
