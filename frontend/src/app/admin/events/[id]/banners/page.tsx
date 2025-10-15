@@ -1,98 +1,159 @@
-/**
- * Feature: 010-ok-now-i - Event Advertisement Banner System
- * Page: Banner management for admin
- *
- * Allows event admins to upload, manage, and configure advertisement banners
- * across 5 predefined slots with different dimensions and positioning.
- */
+'use client';
 
-import { cookies } from 'next/headers';
-import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
-import { redirect } from 'next/navigation';
-import type { Database } from '@/types/database.types';
+import { useState, useEffect } from 'react';
+import { useRouter, useParams } from 'next/navigation';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import AdminHeader from '@/components/admin/AdminHeader';
 import BannerManager from '@/components/admin/BannerManager';
 
-// Disable caching for this page - always fetch fresh data
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
-
-interface PageProps {
-  params: {
-    id: string;
-  };
+interface Event {
+  id: string;
+  name: string;
+  title: string;
+  status: 'draft' | 'upcoming' | 'ongoing' | 'past';
 }
 
-export default async function BannersManagementPage({ params }: PageProps) {
-  const supabase = createServerComponentClient<Database>({ cookies });
+export default function EventBannersPage() {
+  const router = useRouter();
+  const params = useParams();
+  const supabase = createClientComponentClient();
 
-  // Check authentication
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+  const eventId = params.id as string;
 
-  if (!session) {
-    redirect('/login');
-  }
+  const [event, setEvent] = useState<Event | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  try {
-    // Verify event exists and user has access (via RLS)
-    const { data: eventData, error: eventError } = await supabase
-      .from('events')
-      .select('id, name, slug, tenant_id')
-      .eq('id', params.id)
-      .single();
+  useEffect(() => {
+    fetchEvent();
+  }, [eventId]);
 
-    if (eventError || !eventData) {
-      throw new Error('Event not found or access denied');
+  const fetchEvent = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Get current user for auth
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        router.push('/login');
+        return;
+      }
+
+      // Fetch event from Supabase
+      const { data: eventData, error: eventError } = await supabase
+        .from('events')
+        .select('id, name, title, status')
+        .eq('id', eventId)
+        .single();
+
+      if (eventError) {
+        if (eventError.code === 'PGRST116') {
+          throw new Error('Evento non trovato');
+        }
+        throw new Error('Errore nel caricamento dell\'evento');
+      }
+
+      setEvent(eventData);
+    } catch (err: any) {
+      console.error('Error fetching event:', err);
+      setError(err.message || 'Errore nel caricamento dell\'evento');
+    } finally {
+      setLoading(false);
     }
+  };
 
+  if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-primary/5 via-white to-secondary/5 dark:from-[#0B0B0C] dark:via-[#111827] dark:to-[#0B0B0C]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {/* Back Navigation */}
-          <div className="mb-6">
-            <a
-              href={`/admin/events/${params.id}/dashboard`}
-              className="text-primary hover:text-primary/90 flex items-center gap-2"
-            >
-              ← Back to Event Dashboard
-            </a>
+        <header className="bg-white shadow-sm">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <h1 className="text-2xl font-bold text-gray-900">Caricamento...</h1>
           </div>
-
-          {/* Page Header */}
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-brandBlack mb-2">Advertisement Banners</h1>
-            <p className="text-brandInk/70">
-              Manage banners for <span className="font-medium">{eventData.name}</span>
-            </p>
+        </header>
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="flex items-center justify-center py-12">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+              <p className="text-gray-600">Caricamento evento...</p>
+            </div>
           </div>
-
-          {/* Banner Manager Component */}
-          <div className="bg-white dark:bg-gray-900 shadow rounded-lg p-6 border border-gray-200 dark:border-gray-800">
-            <BannerManager eventId={params.id} />
-          </div>
-        </div>
-      </div>
-    );
-  } catch (error: any) {
-    console.error('Banner management page error:', error);
-
-    // Event not found or access denied
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-primary/5 via-white to-secondary/5 dark:from-[#0B0B0C] dark:via-[#111827] dark:to-[#0B0B0C] flex items-center justify-center">
-        <div className="bg-white dark:bg-gray-900 shadow rounded-lg p-8 max-w-md border border-gray-200 dark:border-gray-800">
-          <h1 className="text-2xl font-bold text-red-600 mb-4">Access Denied</h1>
-          <p className="text-brandInk mb-4">
-            {error.message || 'You do not have permission to access this page.'}
-          </p>
-          <a
-            href="/admin/events"
-            className="block text-center px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90"
-          >
-            Back to Event Management
-          </a>
-        </div>
+        </main>
       </div>
     );
   }
+
+  if (error && !event) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-primary/5 via-white to-secondary/5 dark:from-[#0B0B0C] dark:via-[#111827] dark:to-[#0B0B0C]">
+        <header className="bg-white shadow-sm">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <h1 className="text-2xl font-bold text-gray-900">Errore</h1>
+          </div>
+        </header>
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <div className="flex gap-3">
+              <svg
+                className="w-6 h-6 text-red-600 flex-shrink-0"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              <div>
+                <h3 className="text-lg font-medium text-gray-900">Errore</h3>
+                <p className="text-sm text-gray-600 mt-1">{error}</p>
+                <button
+                  onClick={() => router.push('/admin/events')}
+                  className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm"
+                >
+                  Torna alla Lista Eventi
+                </button>
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (!event) {
+    return null;
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-white to-secondary/5 dark:from-[#0B0B0C] dark:via-[#111827] dark:to-[#0B0B0C]">
+      <AdminHeader
+        title="Gestione Banner"
+        subtitle={`Gestisci i banner pubblicitari per ${event.name}`}
+        actions={
+          <button
+            onClick={() => router.push(`/admin/events/${eventId}/dashboard`)}
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            ← Torna alla Dashboard
+          </button>
+        }
+      />
+
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-md p-6">
+          <BannerManager
+            eventId={eventId}
+            onUpdate={() => {
+              // Optionally refresh event data
+              fetchEvent();
+            }}
+          />
+        </div>
+      </main>
+    </div>
+  );
 }

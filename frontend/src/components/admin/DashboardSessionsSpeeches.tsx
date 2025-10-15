@@ -3,11 +3,12 @@
 // Dashboard Sessions & Speeches Manager
 // Unified component to manage sessions and speeches inline
 
-import { useState } from 'react';
+import { useState, useCallback, useMemo, memo } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { Calendar, Clock, MapPin, Plus, Edit, Trash, Upload, GripVertical } from 'lucide-react';
 import ThumbnailQuotaBadge from './ThumbnailQuotaBadge';
 import { useThumbnailProgress } from '@/hooks/useThumbnailProgress';
+import SpeechEditForm from './SpeechEditForm';
 import {
   DndContext,
   closestCenter,
@@ -136,6 +137,11 @@ export default function DashboardSessionsSpeeches({
     duration: '',
   });
 
+  const handleSpeechFormChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setSpeechFormData(prev => ({ ...prev, [name]: value }));
+  }, []);
+
   // ==================== DRAG AND DROP ====================
 
   const sensors = useSensors(
@@ -201,11 +207,18 @@ export default function DashboardSessionsSpeeches({
     }
   };
 
+  const handleSessionFormChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setSessionFormData(prev => ({ ...prev, [name]: value }));
+  }, []);
+
   // ==================== SESSION CRUD ====================
 
   const combineDateAndTime = (time: string): string => {
     if (!time) return '';
-    return `${eventDate}T${time}:00.000Z`;
+    // Simply combine date and time without timezone conversion
+    // Store as-is and let PostgreSQL handle it as timestamp without timezone
+    return `${eventDate}T${time}:00.000`;
   };
 
   const resetSessionForm = () => {
@@ -306,8 +319,11 @@ export default function DashboardSessionsSpeeches({
 
   const startEditSession = (session: Session) => {
     const extractTime = (isoDateTime: string) => {
-      const date = new Date(isoDateTime);
-      return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+      // Extract time directly from ISO string without Date conversion
+      // Format: "2025-10-29T09:00:00" → "09:00"
+      const timePart = isoDateTime.split('T')[1];
+      if (!timePart) return '';
+      return timePart.substring(0, 5); // Get HH:MM
     };
 
     setSessionFormData({
@@ -323,7 +339,7 @@ export default function DashboardSessionsSpeeches({
 
   // ==================== SPEECH CRUD ====================
 
-  const resetSpeechForm = () => {
+  const resetSpeechForm = useCallback(() => {
     setSpeechFormData({
       session_id: '',
       title: '',
@@ -333,7 +349,12 @@ export default function DashboardSessionsSpeeches({
     });
     setAddingSpeechToSession(null);
     setEditingSpeechId(null);
-  };
+  }, []);
+
+  const handleSpeechUpdate = useCallback((updatedSpeech: Speech) => {
+    setSpeeches(prev => prev.map((sp) => (sp.id === updatedSpeech.id ? updatedSpeech : sp)));
+    resetSpeechForm();
+  }, [resetSpeechForm]);
 
   const handleCreateSpeech = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -445,11 +466,11 @@ export default function DashboardSessionsSpeeches({
   // ==================== FORMATTERS ====================
 
   const formatDateTime = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleString('it-IT', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    // Extract time directly from ISO string without Date conversion to avoid timezone issues
+    // Format: "2025-10-29T09:00:00" → "09:00"
+    const timePart = dateString.split('T')[1];
+    if (!timePart) return '';
+    return timePart.substring(0, 5); // Get HH:MM
   };
 
   const formatEventDate = (dateString: string) => {
@@ -486,73 +507,9 @@ export default function DashboardSessionsSpeeches({
       opacity: isDragging ? 0.5 : 1,
     };
 
+    // If editing, don't render the speech card - the form is rendered separately
     if (isEditingThis) {
-      return (
-        <div className="bg-yellow-50 dark:bg-yellow-900/20 p-4">
-          <h4 className="text-md font-bold text-yellow-900 dark:text-yellow-100 mb-4">
-            Modifica Intervento
-          </h4>
-
-          <form onSubmit={handleUpdateSpeech} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-yellow-900 dark:text-yellow-100 mb-1">
-                Titolo <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                value={speechFormData.title}
-                onChange={(e) => setSpeechFormData({ ...speechFormData, title: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg !text-gray-900 placeholder:!text-gray-500 focus:outline-none focus:ring-2 focus:ring-yellow-500"
-                required
-                maxLength={150}
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-yellow-900 dark:text-yellow-100 mb-1">
-                Relatore
-              </label>
-              <input
-                type="text"
-                value={speechFormData.speaker_name}
-                onChange={(e) => setSpeechFormData({ ...speechFormData, speaker_name: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg !text-gray-900 placeholder:!text-gray-500 focus:outline-none focus:ring-2 focus:ring-yellow-500"
-                maxLength={100}
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-yellow-900 dark:text-yellow-100 mb-1">
-                Durata (minuti)
-              </label>
-              <input
-                type="number"
-                value={speechFormData.duration}
-                onChange={(e) => setSpeechFormData({ ...speechFormData, duration: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg !text-gray-900 placeholder:!text-gray-500 focus:outline-none focus:ring-2 focus:ring-yellow-500"
-                min="1"
-                max="600"
-              />
-            </div>
-
-            <div className="flex gap-3">
-              <button
-                type="submit"
-                className="px-4 py-2 bg-yellow-600 text-white font-medium rounded-lg hover:bg-yellow-700 transition"
-              >
-                Salva Modifiche
-              </button>
-              <button
-                type="button"
-                onClick={resetSpeechForm}
-                className="px-4 py-2 bg-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-300 transition"
-              >
-                Annulla
-              </button>
-            </div>
-          </form>
-        </div>
-      );
+      return null;
     }
 
     return (
@@ -617,6 +574,28 @@ export default function DashboardSessionsSpeeches({
     );
   }
 
+  const MemoizedSortableSpeech = memo(SortableSpeech);
+
+  // ==================== MEMOIZED DATA ====================
+
+  // Memoize speeches grouped by session to prevent unnecessary recalculations
+  const speechesBySession = useMemo(() => {
+    const map = new Map<string, Speech[]>();
+    sessions.forEach(session => {
+      const sessionSpeeches = speeches
+        .filter((sp) => sp.session_id === session.id)
+        .sort((a, b) => a.display_order - b.display_order);
+      map.set(session.id, sessionSpeeches);
+    });
+    return map;
+  }, [speeches, sessions]);
+
+  // Memoize the speech being edited to maintain object reference stability
+  const editingSpeech = useMemo(() => {
+    if (!editingSpeechId) return null;
+    return speeches.find(sp => sp.id === editingSpeechId) || null;
+  }, [editingSpeechId, speeches]);
+
   // ==================== RENDER ====================
 
   return (
@@ -647,7 +626,7 @@ export default function DashboardSessionsSpeeches({
 
       {/* Session Create/Edit Form */}
       {(isCreatingSession || editingSessionId) && (
-        <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-6 mb-6 border border-gray-200 dark:border-gray-700">
+        <div key={editingSessionId || 'new-session'} className="bg-gray-50 dark:bg-gray-800 rounded-lg p-6 mb-6 border border-gray-200 dark:border-gray-700">
           <h3 className="text-lg font-bold text-brandBlack mb-4">
             {editingSessionId ? 'Modifica Sessione' : 'Nuova Sessione'}
           </h3>
@@ -659,8 +638,9 @@ export default function DashboardSessionsSpeeches({
               </label>
               <input
                 type="text"
+                name="title"
                 value={sessionFormData.title}
-                onChange={(e) => setSessionFormData({ ...sessionFormData, title: e.target.value })}
+                onChange={handleSessionFormChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg !text-gray-900 placeholder:!text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary"
                 required
                 maxLength={100}
@@ -675,8 +655,9 @@ export default function DashboardSessionsSpeeches({
                 </label>
                 <input
                   type="time"
+                  name="start_time"
                   value={sessionFormData.start_time}
-                  onChange={(e) => setSessionFormData({ ...sessionFormData, start_time: e.target.value })}
+                  onChange={handleSessionFormChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg !text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary"
                   required
                 />
@@ -688,8 +669,9 @@ export default function DashboardSessionsSpeeches({
                 </label>
                 <input
                   type="time"
+                  name="end_time"
                   value={sessionFormData.end_time}
-                  onChange={(e) => setSessionFormData({ ...sessionFormData, end_time: e.target.value })}
+                  onChange={handleSessionFormChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg !text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
@@ -701,8 +683,9 @@ export default function DashboardSessionsSpeeches({
               </label>
               <input
                 type="text"
+                name="room"
                 value={sessionFormData.room}
-                onChange={(e) => setSessionFormData({ ...sessionFormData, room: e.target.value })}
+                onChange={handleSessionFormChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg !text-gray-900 placeholder:!text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary"
                 maxLength={100}
                 placeholder="es. Sala Conferenze A"
@@ -728,13 +711,23 @@ export default function DashboardSessionsSpeeches({
         </div>
       )}
 
+      {/* Speech Edit Form - OUTSIDE sessions loop */}
+      {editingSpeechId && (
+        <SpeechEditForm
+          key={editingSpeechId}
+          speechId={editingSpeechId}
+          onCancel={resetSpeechForm}
+          onUpdate={handleSpeechUpdate}
+        />
+      )}
+
       {/* Sessions List */}
       {sessions.length === 0 ? (
         <p className="text-brandInk/70 text-center py-8">Nessuna sessione programmata. Clicca su "Nuova Sessione" per iniziare.</p>
       ) : (
         <div className="space-y-4">
           {sessions.map((session) => {
-            const sessionSpeeches = speeches.filter((sp) => sp.session_id === session.id);
+            const sessionSpeeches = speechesBySession.get(session.id) || [];
             const isAddingToThis = addingSpeechToSession === session.id;
 
             return (
@@ -870,15 +863,15 @@ export default function DashboardSessionsSpeeches({
                     onDragEnd={(event) => handleDragEnd(event, session.id)}
                   >
                     <SortableContext
-                      items={sessionSpeeches.sort((a, b) => a.display_order - b.display_order).map(sp => sp.id)}
+                      items={sessionSpeeches.map(sp => sp.id)}
                       strategy={verticalListSortingStrategy}
                     >
                       <div className="divide-y divide-gray-200 dark:divide-gray-700">
-                        {sessionSpeeches.sort((a, b) => a.display_order - b.display_order).map((speech) => {
+                        {sessionSpeeches.map((speech) => {
                           const isEditingThis = editingSpeechId === speech.id;
                           return (
                             <div key={speech.id}>
-                              <SortableSpeech
+                              <MemoizedSortableSpeech
                                 speech={speech}
                                 isEditingThis={isEditingThis}
                                 eventId={eventId}
