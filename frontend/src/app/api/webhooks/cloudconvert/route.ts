@@ -381,15 +381,4 @@ function extractMetadataFromJob(
  */
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-
-/**
- * Disable body size limit for webhooks
- * CloudConvert payloads can be large
- */
-export const config = {
-  api: {
-    bodyParser: {
-      sizeLimit: '10mb',
-    },
-  },
-};
+export const maxDuration = 10; // Allow up to 10 seconds for webhook processing
