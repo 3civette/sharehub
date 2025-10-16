@@ -14,6 +14,9 @@
   # Node version
   NODE_VERSION = "20"
 
+  # Python version (required for bcrypt native compilation)
+  PYTHON_VERSION = "3.13"
+
   # Next.js specific
   NEXT_TELEMETRY_DISABLED = "1"
 
