@@ -8,8 +8,7 @@
   # Build command
   command = "npm run build"
 
-  # Output directory - Netlify handles Next.js automatically
-  publish = ".next"
+  # Note: No publish directory needed - @netlify/plugin-nextjs handles this automatically
 
 [build.environment]
   # Node version
