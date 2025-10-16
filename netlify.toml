@@ -2,13 +2,10 @@
 # https://docs.netlify.com/configure-builds/file-based-configuration/
 
 [build]
-  # Base directory for the frontend
-  base = "frontend"
+  # Build command runs from project root
+  command = "cd frontend && npm run build"
 
-  # Build command
-  command = "npm run build"
-
-  # Note: No publish directory needed - @netlify/plugin-nextjs handles this automatically
+  # Note: No base or publish directory needed - @netlify/plugin-nextjs handles this automatically
 
 [build.environment]
   # Node version
